@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPR in Action — FDM Digital Twin Simulator</title>
+<meta name="description" content="Interactive Gaussian Process Regression simulator aligned with the FDM Agentic Digital Twin pipeline. Teaches how GPR works in the surrogate modeling and Bayesian Active Learning stages.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — FDM Digital Twin GPR Simulator
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg: #0a0e14;
+  --bg2: #0d1219;
+  --panel: #111820;
+  --panel2: #0c1018;
+  --panel-glass: rgba(17, 24, 32, 0.85);
+  --ink: #e2e8f0;
+  --ink2: #f1f5f9;
+  --dim: #7c8a9a;
+  --dim2: #5a6775;
+  --line: #1e2a38;
+  --line2: #253142;
+
+  /* Pipeline stage colors */
+  --stage1: #a78bfa;   /* purple — Ingestion */
+  --stage2: #60a5fa;   /* blue — Cleaning */
+  --stage3: #3ddcac;   /* teal — GPR Surrogate */
+  --stage4: #f59e0b;   /* amber — BAL Acquisition */
+  --stage5: #f87171;   /* red — Validation */
+
+  /* Functional colors */
+  --teal: #3ddcac;
+  --blue: #4da6ff;
+  --amber: #f59e0b;
+  --coral: #ff8a5c;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --green: #34d399;
+
+  --mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --sans: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.35);
+  --shadow-glow: 0 0 30px rgba(61,220,172,0.08);
+}
+
+/* ── Reset & Base ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Ambient Background ──────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  top: -30%; left: -20%;
+  width: 70%; height: 70%;
+  background: radial-gradient(ellipse, rgba(61,220,172,0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -30%; right: -20%;
+  width: 60%; height: 60%;
+  background: radial-gradient(ellipse, rgba(77,166,255,0.03) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Header ────────────────────────────────────────────────────────── */
+.header {
+  margin-bottom: 8px;
+}
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.header h1 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--teal), var(--blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header .subtitle {
+  font-size: 13px;
+  color: var(--dim);
+  font-weight: 500;
+  margin-top: 2px;
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
+.header .lead {
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.65;
+  margin-top: 12px;
+  max-width: 900px;
+}
+
+#tour-start {
+  background: linear-gradient(135deg, var(--coral), #e06040);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 11px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+#tour-start:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255,138,92,0.3);
+}
+
+/* ── Pipeline Progress Bar ─────────────────────────────────────────── */
+.pipeline-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 20px 0 24px;
+  padding: 14px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.pipe-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--dim2);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.4s ease;
+  white-space: nowrap;
+  cursor: default;
+  position: relative;
+}
+.pipe-stage .num {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--line);
+  color: var(--dim2);
+  transition: all 0.4s ease;
+}
+.pipe-stage.active {
+  color: var(--ink);
+  background: rgba(61,220,172,0.08);
+  border-color: rgba(61,220,172,0.2);
+}
+.pipe-stage.active .num {
+  background: var(--teal);
+  color: #04342c;
+}
+.pipe-stage.s1.active { background: rgba(167,139,250,0.08); border-color: rgba(167,139,250,0.2); }
+.pipe-stage.s1.active .num { background: var(--stage1); color: #1a0a3e; }
+.pipe-stage.s2.active { background: rgba(96,165,250,0.08); border-color: rgba(96,165,250,0.2); }
+.pipe-stage.s2.active .num { background: var(--stage2); color: #0a2a4e; }
+.pipe-stage.s3.active { background: rgba(61,220,172,0.08); border-color: rgba(61,220,172,0.2); }
+.pipe-stage.s3.active .num { background: var(--stage3); color: #04342c; }
+.pipe-stage.s4.active { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); }
+.pipe-stage.s4.active .num { background: var(--stage4); color: #3a2505; }
+.pipe-stage.s5.active { background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.2); }
+.pipe-stage.s5.active .num { background: var(--stage5); color: #3e0a0a; }
+
+.pipe-arrow {
+  color: var(--line);
+  font-size: 16px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.pipe-arrow.loop {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+/* ── Variable Glossary ─────────────────────────────────────────────── */
+.glossary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 22px;
+  font-size: 12.5px;
+  color: var(--dim);
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.glossary b {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.glossary .sep {
+  width: 100%;
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
+}
+
+/* ── Grid Layout ───────────────────────────────────────────────────── */
+.grid {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.col-left { flex: 1 1 580px; min-width: 340px; }
+.col-right { flex: 1 1 440px; min-width: 340px; }
+
+/* ── Panels ────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.3s ease;
+}
+.panel:hover {
+  border-color: var(--line2);
+}
+.panel h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 14px;
+  color: var(--ink2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.panel h2 .tag {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--mono);
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.panel h2 .tag.s3 { background: rgba(61,220,172,0.12); color: var(--teal); }
+.panel h2 .tag.s4 { background: rgba(245,158,11,0.12); color: var(--amber); }
+.panel h2 span {
+  color: var(--dim);
+  font-weight: 400;
+  font-size: 12px;
+  margin-left: auto;
+}
+
+/* ── SVG Plot ──────────────────────────────────────────────────────── */
+svg#plot { width: 100%; height: auto; display: block; }
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--dim);
+}
+.legend-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sw {
+  width: 14px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* ── Parameter Selector ────────────────────────────────────────────── */
+.param-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.param-selector label {
+  font-size: 12.5px;
+  color: var(--dim);
+  font-weight: 500;
+}
+.param-selector select {
+  background: var(--bg2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.param-selector select:focus {
+  border-color: var(--teal);
+}
+.param-selector .held-info {
+  font-size: 11.5px;
+  color: var(--dim2);
+  font-family: var(--mono);
+}
+
+/* ── Target Tab Selector ──────────────────────────────────────────── */
+.target-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.target-tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--mono);
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  transition: all 0.2s;
+}
+.target-tab:hover { border-color: var(--line2); color: var(--ink); }
+.target-tab.active {
+  background: rgba(61,220,172,0.1);
+  border-color: rgba(61,220,172,0.3);
+  color: var(--teal);
+}
+
+/* ── Controls ──────────────────────────────────────────────────────── */
+.controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.ctrl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ctrl label {
+  font-size: 12.5px;
+  color: var(--dim);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.ctrl label b {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.ctrl label .unit {
+  font-size: 11px;
+  color: var(--dim2);
+  font-family: var(--mono);
+  margin-left: 4px;
+}
+input[type=range] {
+  width: 100%;
+  accent-color: var(--teal);
+  height: 6px;
+  cursor: pointer;
+}
+.ctrl .hint {
+  font-size: 11.5px;
+  color: var(--dim2);
+  line-height: 1.4;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+button {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+}
+button:hover { transform: translateY(-1px); }
+button:active { transform: translateY(0); }
+button.primary {
+  background: linear-gradient(135deg, var(--teal), #2bc89a);
+  color: #04342c;
+}
+button.primary:hover { box-shadow: 0 4px 16px rgba(61,220,172,0.3); }
+button.secondary {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+button.secondary:hover { border-color: var(--line2); }
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── Kernel Matrix ─────────────────────────────────────────────────── */
+table.mtx {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  margin-top: 8px;
+}
+table.mtx td {
+  border: 1px solid var(--line);
+  padding: 5px 9px;
+  text-align: right;
+  color: var(--dim);
+  transition: background 0.2s;
+}
+table.mtx td.diag {
+  color: var(--amber);
+  background: rgba(245,158,11,0.05);
+}
+
+details { margin-top: 10px; }
+details summary {
+  cursor: pointer;
+  color: var(--dim);
+  font-size: 12.5px;
+  transition: color 0.2s;
+}
+details summary:hover { color: var(--ink); }
+details[open] summary { color: var(--ink); }
+
+/* ── Computation Trace ─────────────────────────────────────────────── */
+.trace-row {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.35s ease, transform 0.35s ease, box-shadow 0.3s ease, background 0.3s ease;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--line);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.trace-row.in { opacity: 1; transform: translateY(0); }
+.trace-row:last-child { border-bottom: none; }
+.trace-row .k { color: var(--teal); }
+.trace-row .a { color: var(--amber); }
+.trace-row .m { color: var(--blue); }
+.trace-row .note {
+  display: block;
+  color: var(--dim);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  margin-top: 3px;
+  line-height: 1.5;
+  padding-left: 2px;
+}
+.trace-row .code-ref {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--mono);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(167,139,250,0.1);
+  color: var(--purple);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ── Result Boxes ──────────────────────────────────────────────────── */
+.result-box {
+  display: flex;
+  gap: 14px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.result {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px;
+  text-align: center;
+  flex: 1;
+  min-width: 120px;
+  transition: border-color 0.3s;
+}
+.result:hover { border-color: var(--line2); }
+.result .lbl {
+  font-size: 11px;
+  color: var(--dim);
+  margin-bottom: 4px;
+  font-family: var(--mono);
+}
+.result .val {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+}
+.result.mean .val { color: var(--blue); }
+.result.unc .val { color: var(--coral); }
+.result .unit-label {
+  font-size: 10px;
+  color: var(--dim2);
+  margin-top: 2px;
+  font-family: var(--mono);
+}
+
+/* ── BAL Visualization ────────────────────────────────────────────── */
+.bal-viz {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: rgba(245,158,11,0.04);
+  border: 1px solid rgba(245,158,11,0.15);
+  border-radius: 10px;
+}
+.bal-viz h3 {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--amber);
+  margin-bottom: 8px;
+  font-family: var(--mono);
+}
+.bal-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bal-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--dim);
+}
+.bal-bar-row .bar-label { width: 60px; text-align: right; flex-shrink: 0; }
+.bal-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bal-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+.bal-bar-row .bar-val { width: 50px; font-size: 10px; }
+
+/* ── Tour Styles ───────────────────────────────────────────────────── */
+.trace-row.tour-focus {
+  background: rgba(61,220,172,0.06);
+  box-shadow: inset 3px 0 0 var(--teal);
+  padding-left: 10px;
+  border-radius: 4px;
+}
+.trace-row.tour-dim { opacity: 0.2 !important; }
+
+#tour-spotlight {
+  position: fixed;
+  z-index: 9998;
+  pointer-events: none;
+  border: 2px solid var(--teal);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(3,7,11,0.82), 0 0 30px rgba(61,220,172,0.25);
+  transition: top 0.45s cubic-bezier(.4,0,.2,1), left 0.45s cubic-bezier(.4,0,.2,1),
+              width 0.45s cubic-bezier(.4,0,.2,1), height 0.45s cubic-bezier(.4,0,.2,1), opacity 0.3s ease;
+  opacity: 0;
+}
+#tour-spotlight.active { opacity: 1; }
+
+#tour-popup {
+  position: fixed;
+  z-index: 9999;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  width: min(520px, 92vw);
+  background: #0e151e;
+  border: 1px solid #2c3742;
+  border-radius: 16px;
+  padding: 20px 22px 18px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+#tour-popup.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+#tour-popup .tour-step-count {
+  font-size: 11px;
+  color: var(--teal);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+#tour-popup .tour-stage-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--mono);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 10px;
+  letter-spacing: 0.03em;
+}
+#tour-popup h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--ink2);
+  font-weight: 700;
+}
+#tour-popup p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #b4bcc6;
+}
+#tour-popup .tour-code {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--teal);
+  overflow-x: auto;
+  white-space: pre;
+}
+#tour-popup .tour-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+#tour-popup .tour-nav-btns { display: flex; gap: 8px; }
+#tour-popup .tour-nav button { padding: 8px 16px; font-size: 12.5px; }
+#tour-skip {
+  background: none;
+  border: none;
+  color: #5a6775;
+  font-size: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+#tour-skip:hover { color: var(--dim); }
+
+/* ── Responsive ────────────────────────────────────────────────────── */
+@media (max-width: 820px) {
+  .grid { flex-direction: column; }
+  .pipeline-bar { flex-wrap: wrap; gap: 4px; }
+  .pipe-stage { font-size: 11px; padding: 5px 10px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ═══════════════ HEADER ═══════════════ -->
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <h1>GPR in Action — FDM Digital Twin</h1>
+        <div class="subtitle">Material: PLA &nbsp;|&nbsp; Machine: Ultimaker S5 &nbsp;|&nbsp; Kernel: Matérn(ν=2.5)</div>
+        <p class="lead">
+          This is the exact math that runs inside <b>Stage 03</b> (surrogate training) and <b>Stage 04</b> (Bayesian Active Learning) of our pipeline.
+          Pick a print parameter to vary, drag the query point x*, and watch every kernel similarity, weight, prediction, and uncertainty computed live — nothing is pre-rendered.
+          The numbers here use the same formulas, same kernel, and same variables as <code>stage_03_surrogate.py</code> and <code>stage_04_acquisition.py</code>.
+        </p>
+      </div>
+      <button id="tour-start">▶ Start Teaching Mode</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PIPELINE PROGRESS BAR ═══════════════ -->
+  <div class="pipeline-bar" id="pipeline-bar">
+    <div class="pipe-stage s1" data-stage="1"><span class="num">1</span> Ingestion</div>
+    <span class="pipe-arrow">→</span>
+    <div class="pipe-stage s2" data-stage="2"><span class="num">2</span> Cleaning</div>
+    <span class="pipe-arrow">→</span>
+    <div class="pipe-stage s3 active" data-stage="3"><span class="num">3</span> GPR Surrogate</div>
+    <span class="pipe-arrow loop">⇄</span>
+    <div class="pipe-stage s4 active" data-stage="4"><span class="num">4</span> BAL Acquisition</div>
+    <span class="pipe-arrow">→</span>
+    <div class="pipe-stage s5" data-stage="5"><span class="num">5</span> Validation</div>
+  </div>
+
+  <!-- ═══════════════ VARIABLE GLOSSARY ═══════════════ -->
+  <div class="glossary" id="glossary">
+    <span><b>x*</b> = the new print setting you're querying (e.g., nozzle temp °C)</span>
+    <span><b>xᵢ</b> = training data points (real Ultimaker S5 measurements)</span>
+    <span><b>dᵢ</b> = |x* − xᵢ| distance from query to training point i</span>
+    <div class="sep"></div>
+    <span><b>k*(x*, xᵢ)</b> = Matérn(ν=2.5) kernel similarity — how relevant point i is</span>
+    <span><b>K</b> = kernel matrix (all training-to-training similarities + WhiteKernel noise)</span>
+    <span><b>α = K⁻¹ y</b> = learned weights solved once from training data</span>
+    <div class="sep"></div>
+    <span><b>μ(x*)</b> = Σ kᵢ × αᵢ — the predicted mean output</span>
+    <span><b>σ(x*)</b> = √(σ²_f − k*ᵀ K⁻¹ k*) — the uncertainty (drives BAL)</span>
+    <span><b>σ²_f</b> = signal variance (ConstantKernel amplitude)</span>
+    <span><b>σ²_n</b> = noise variance (WhiteKernel — learned, not hardcoded)</span>
+  </div>
+
+  <!-- ═══════════════ MAIN GRID ═══════════════ -->
+  <div class="grid">
+
+    <!-- ── LEFT COLUMN ─────────────────────────────────────────── -->
+    <div class="col-left">
+
+      <!-- Plot Panel -->
+      <div class="panel" id="panel-plot">
+        <h2>
+          GPR Prediction Plot
+          <span class="tag s3">STAGE 03</span>
+          <span>drag the slider or click on the curve</span>
+        </h2>
+
+        <!-- Target Tabs -->
+        <div class="target-tabs" id="target-tabs">
+          <button class="target-tab active" data-target="tension_strenght">Tension Strength (MPa)</button>
+          <button class="target-tab" data-target="roughness">Roughness (µm)</button>
+          <button class="target-tab" data-target="elongation">Elongation (%)</button>
+        </div>
+
+        <!-- Parameter Selector -->
+        <div class="param-selector">
+          <label>Vary parameter:</label>
+          <select id="param-select">
+            <option value="nozzle_temperature">nozzle_temperature (°C)</option>
+            <option value="print_speed">print_speed (mm/s)</option>
+            <option value="layer_height">layer_height (mm)</option>
+            <option value="infill_density">infill_density (%)</option>
+            <option value="fan_speed">fan_speed (%)</option>
+          </select>
+          <span class="held-info" id="held-info">others held at midpoint</span>
+        </div>
+
+        <svg id="plot" viewBox="0 0 660 370"></svg>
+
+        <div class="legend-row">
+          <span><i class="sw" style="background:var(--teal)"></i> mean μ(x)</span>
+          <span><i class="sw" style="background:var(--blue);opacity:.4"></i> ±2σ uncertainty band</span>
+          <span><i class="sw" style="background:var(--amber)"></i> training data</span>
+          <span><i class="sw" style="background:var(--coral)"></i> query point x*</span>
+        </div>
+      </div>
+
+      <!-- Hyperparameters Panel -->
+      <div class="panel" id="panel-hyper">
+        <h2>
+          Kernel Hyperparameters
+          <span class="tag s3">STAGE 03</span>
+          <span>from _construct_kernel() in stage_03_surrogate.py</span>
+        </h2>
+        <div class="controls">
+          <div class="ctrl" id="ctrlbox-x">
+            <label>query point x* <b id="lbl-x">205</b><span class="unit" id="unit-x">°C</span></label>
+            <input type="range" id="ctl-x" min="180" max="230" step="0.5" value="205">
+            <span class="hint">The print setting we're asking the GPR to predict at — this is what Stage 04 varies to find high-σ regions</span>
+          </div>
+          <div class="ctrl" id="ctrlbox-l">
+            <label>length_scale ℓ <b id="lbl-l">12.0</b></label>
+            <input type="range" id="ctl-l" min="1" max="50" step="0.5" value="12">
+            <span class="hint">Matérn correlation reach — bounds (1e-2, 1e3) in _construct_kernel(). Small ℓ = trust only nearby data</span>
+          </div>
+          <div class="ctrl" id="ctrlbox-sf">
+            <label>signal variance σ²_f (ConstantKernel) <b id="lbl-sf">25</b></label>
+            <input type="range" id="ctl-sf" min="1" max="100" step="1" value="25">
+            <span class="hint">ConstantKernel amplitude — bounds (1e-3, 1e7). Controls how much the function can vary overall</span>
+          </div>
+          <div class="ctrl" id="ctrlbox-n">
+            <label>noise σ²_n (WhiteKernel) <b id="lbl-n">0.50</b></label>
+            <input type="range" id="ctl-n" min="0" max="5" step="0.05" value="0.5">
+            <span class="hint">WhiteKernel noise — <b>learned</b> via log-marginal likelihood, not hardcoded. alpha=1e-6 is Cholesky stability only</span>
+          </div>
+        </div>
+
+        <details id="details-matrices">
+          <summary>show kernel matrix K and K⁻¹ (the "solving" from Stage 03)</summary>
+          <div id="matrices"></div>
+        </details>
+      </div>
+
+      <!-- BAL Acquisition Panel -->
+      <div class="panel" id="panel-bal">
+        <h2>
+          BAL Acquisition Signal
+          <span class="tag s4">STAGE 04</span>
+          <span>how Stage 04 picks the next batch of points</span>
+        </h2>
+        <div class="bal-viz" id="bal-viz">
+          <h3>Domain-Range Normalized σ at x* — Stage 04 Ranking</h3>
+          <div class="bal-bar-container" id="bal-bars"></div>
+          <div style="margin-top:10px;font-size:11px;color:var(--dim);font-family:var(--mono);">
+            Stage 04 evaluates σ at 50,000 Sobol candidates, normalizes by domain range, then greedily selects top-100 with Local Penalization for batch diversity.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── RIGHT COLUMN ────────────────────────────────────────── -->
+    <div class="col-right">
+
+      <!-- Live Computation Trace Panel -->
+      <div class="panel" id="panel-trace">
+        <h2>
+          Live Computation Trace
+          <span class="tag s3">STAGE 03</span>
+        </h2>
+        <div class="btn-row">
+          <button class="primary" id="run-btn">Run Computation ▶</button>
+          <button class="secondary" id="reset-btn">Reset Example</button>
+        </div>
+        <div id="trace"></div>
+        <div class="result-box">
+          <div class="result mean">
+            <div class="lbl">predicted mean μ(x*)</div>
+            <div class="val" id="res-mean">–</div>
+            <div class="unit-label" id="res-mean-unit">MPa</div>
+          </div>
+          <div class="result unc">
+            <div class="lbl">uncertainty ±2σ(x*)</div>
+            <div class="val" id="res-unc">–</div>
+            <div class="unit-label" id="res-unc-unit">MPa</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Tour Overlay -->
+<div id="tour-spotlight"></div>
+<div id="tour-popup">
+  <div class="tour-step-count" id="tour-count">STEP 1 / 17</div>
+  <h3 id="tour-title">Welcome</h3>
+  <p id="tour-text">…</p>
+  <div class="tour-nav">
+    <button id="tour-skip" type="button">skip tour</button>
+    <div class="tour-nav-btns">
+      <button class="secondary" id="tour-back" type="button">Back</button>
+      <button class="primary" id="tour-next" type="button">Next</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   FDM DIGITAL TWIN — GPR LIVE SIMULATOR ENGINE
+   Exact alignment with stage_03_surrogate.py & stage_04_acquisition.py
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// ─── FDM PARAMETER DEFINITIONS ─────────────────────────────────────────
+// From config/printer_params.yaml — these are the exact physical bounds
+// of the Ultimaker S5 design space that our pipeline operates in.
+const PARAMS = {
+  nozzle_temperature: { min: 180, max: 230, unit: '°C',   mid: 205, desc: 'Nozzle temperature' },
+  print_speed:        { min: 20,  max: 70,  unit: 'mm/s', mid: 45,  desc: 'Print head speed' },
+  layer_height:       { min: 0.1, max: 0.3, unit: 'mm',   mid: 0.2, desc: 'Layer height' },
+  infill_density:     { min: 20,  max: 100, unit: '%',    mid: 60,  desc: 'Infill density' },
+  fan_speed:          { min: 0,   max: 100, unit: '%',    mid: 50,  desc: 'Fan speed' }
+};
+
+// ─── OUTPUT TARGET DEFINITIONS ──────────────────────────────────────────
+// From config/printer_params.yaml outputs section.
+// Domain ranges from stage_04_acquisition.py _TARGET_DOMAIN_RANGES.
+const TARGETS = {
+  tension_strenght: { unit: 'MPa', desc: 'Tensile strength', range: 100, optimise: 'maximise' },
+  roughness:        { unit: 'µm',  desc: 'Surface roughness', range: 500, optimise: 'minimise' },
+  elongation:       { unit: '%',   desc: 'Elongation at break', range: 50, optimise: 'maximise' }
+};
+
+// ─── REPRESENTATIVE TRAINING DATA ───────────────────────────────────────
+// Simplified 1D projections of real FDM measurements (25-point Kaggle dataset).
+// Each target has sample points along each input parameter, representing
+// the kind of data Stage 01 downloads and Stage 02 cleans.
+// Format: { paramName: { x: [...], y: { target: [...] } } }
+const TRAINING_DATA = {
+  nozzle_temperature: {
+    x: [190, 200, 210, 220, 228],
+    y: {
+      tension_strenght: [32, 38, 42, 40, 36],
+      roughness:        [280, 220, 180, 195, 250],
+      elongation:       [3.2, 4.5, 5.8, 5.1, 4.0]
+    }
+  },
+  print_speed: {
+    x: [25, 35, 45, 55, 65],
+    y: {
+      tension_strenght: [44, 42, 39, 35, 30],
+      roughness:        [160, 185, 210, 260, 320],
+      elongation:       [5.5, 5.2, 4.8, 4.0, 3.2]
+    }
+  },
+  layer_height: {
+    x: [0.12, 0.16, 0.20, 0.24, 0.28],
+    y: {
+      tension_strenght: [45, 42, 38, 34, 30],
+      roughness:        [120, 160, 200, 260, 340],
+      elongation:       [6.0, 5.5, 4.8, 4.0, 3.0]
+    }
+  },
+  infill_density: {
+    x: [25, 40, 60, 80, 95],
+    y: {
+      tension_strenght: [22, 30, 38, 44, 48],
+      roughness:        [240, 220, 200, 190, 185],
+      elongation:       [6.5, 5.8, 4.8, 4.0, 3.5]
+    }
+  },
+  fan_speed: {
+    x: [10, 30, 50, 70, 90],
+    y: {
+      tension_strenght: [35, 38, 41, 40, 37],
+      roughness:        [290, 240, 190, 180, 200],
+      elongation:       [3.8, 4.5, 5.2, 5.0, 4.5]
+    }
+  }
+};
+
+// ─── CURRENT STATE ──────────────────────────────────────────────────────
+let currentParam = 'nozzle_temperature';
+let currentTarget = 'tension_strenght';
+
+// ─── KERNEL: Matérn ν=5/2 ───────────────────────────────────────────────
+// Exact same kernel formula as stage_03_surrogate.py _construct_kernel():
+//   ConstantKernel(σ²_f) × Matérn(ν=2.5, ℓ) + WhiteKernel(σ²_n)
+//
+// The Matérn(ν=5/2) covariance function:
+//   k(d) = σ²_f × (1 + √5·d/ℓ + 5d²/(3ℓ²)) × exp(-√5·d/ℓ)
+//
+// Why Matérn(ν=2.5)? It assumes the physics is smooth but not infinitely
+// differentiable — ideal for FDM thermomechanical processes.
+function matern52(d, l, sigmaF) {
+  const sqrt5 = Math.sqrt(5);
+  const t = sqrt5 * d / l;
+  return sigmaF * sigmaF * (1 + t + (5 * d * d) / (3 * l * l)) * Math.exp(-t);
+}
+
+// ─── LINEAR ALGEBRA (same as the pipeline's numpy operations) ──────────
+function invertMatrix(M) {
+  const n = M.length;
+  let A = M.map((row, i) => row.concat(Array.from({ length: n }, (_, j) => i === j ? 1 : 0)));
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(A[r][col]) > Math.abs(A[piv][col])) piv = r;
+    [A[col], A[piv]] = [A[piv], A[col]];
+    const pv = A[col][col];
+    for (let c = 0; c < 2 * n; c++) A[col][c] /= pv;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = A[r][col];
+      for (let c = 0; c < 2 * n; c++) A[r][c] -= f * A[col][c];
+    }
+  }
+  return A.map(row => row.slice(n));
+}
+function matVec(M, v) { return M.map(row => row.reduce((s, val, i) => s + val * v[i], 0)); }
+function dot(a, b) { return a.reduce((s, val, i) => s + val * b[i], 0); }
+
+// ─── CORE GPR ENGINE ────────────────────────────────────────────────────
+// This mirrors GaussianProcessEngine.execute_training_sequence() from
+// stage_03_surrogate.py — building K, inverting it, solving for α.
+let state = {};
+
+function getActiveData() {
+  const d = TRAINING_DATA[currentParam];
+  return { X: d.x, Y: d.y[currentTarget] };
+}
+
+function getActiveRange() {
+  const p = PARAMS[currentParam];
+  const data = getActiveData();
+  const yVals = data.Y;
+  const yMin = Math.min(...yVals);
+  const yMax = Math.max(...yVals);
+  const yPad = (yMax - yMin) * 0.5;
+  return {
+    xRange: [p.min, p.max],
+    yRange: [Math.max(0, yMin - yPad), yMax + yPad]
+  };
+}
+
+function rebuildModel(l, sigmaF, noise) {
+  // Stage 03: Build the kernel matrix K from all training-to-training pairs
+  // This is exactly what GaussianProcessEngine._construct_kernel() produces
+  // when sklearn's GPR calls kernel_.__call__(X, X).
+  const { X, Y } = getActiveData();
+  const n = X.length;
+  const K = [];
+  for (let i = 0; i < n; i++) {
+    K.push([]);
+    for (let j = 0; j < n; j++) {
+      // ConstantKernel × Matérn(ν=2.5) + WhiteKernel (noise on diagonal only)
+      K[i][j] = matern52(Math.abs(X[i] - X[j]), l, sigmaF) + (i === j ? noise : 0);
+    }
+  }
+  // K⁻¹ — "solving the model" means inverting this matrix
+  // In the real pipeline, sklearn uses Cholesky decomposition (L L^T = K)
+  // with alpha=1e-6 for numerical stability.
+  const Kinv = invertMatrix(K);
+  // α = K⁻¹ × y — the learned weight vector
+  // This is what sklearn computes internally and stores as gpr.alpha_
+  const alpha = matVec(Kinv, Y);
+  state = { K, Kinv, alpha, l, sigmaF, noise };
+}
+
+function predict(xstar) {
+  // Stage 03 prediction: gpr.predict(X_new, return_std=True)
+  const { X } = getActiveData();
+  const { l, sigmaF, Kinv, alpha } = state;
+  // k* = kernel similarities between x* and each training point
+  const kStar = X.map(xi => matern52(Math.abs(xstar - xi), l, sigmaF));
+  // μ(x*) = k*ᵀ × α = weighted sum of training outputs
+  const mean = dot(kStar, alpha);
+  // σ²(x*) = k(x*,x*) − k*ᵀ K⁻¹ k* — leftover uncertainty
+  const kss = sigmaF * sigmaF; // k(x*, x*) = σ²_f (ConstantKernel value)
+  const correction = dot(kStar, matVec(Kinv, kStar));
+  const variance = Math.max(0, kss - correction);
+  return { mean, std: Math.sqrt(variance), kStar, kss, correction };
+}
+
+// ─── PLOTTING ───────────────────────────────────────────────────────────
+const svg = document.getElementById('plot');
+const PX = { x0: 65, x1: 620, y0: 330, y1: 35 };
+
+function mapX(x) {
+  const { xRange } = getActiveRange();
+  return PX.x0 + (x - xRange[0]) / (xRange[1] - xRange[0]) * (PX.x1 - PX.x0);
+}
+function mapY(y) {
+  const { yRange } = getActiveRange();
+  const cl = Math.max(yRange[0], Math.min(yRange[1], y));
+  return PX.y0 - (cl - yRange[0]) / (yRange[1] - yRange[0]) * (PX.y0 - PX.y1);
+}
+
+function render(xstar) {
+  const { xRange, yRange } = getActiveRange();
+  const pInfo = PARAMS[currentParam];
+  const tInfo = TARGETS[currentTarget];
+  const N = 100;
+
+  let upper = [], lower = [], meanPts = [];
+  for (let i = 0; i <= N; i++) {
+    const x = xRange[0] + (xRange[1] - xRange[0]) * i / N;
+    const p = predict(x);
+    meanPts.push([x, p.mean]);
+    upper.push([x, p.mean + 2 * p.std]);
+    lower.push([x, p.mean - 2 * p.std]);
+  }
+
+  const meanPath = meanPts.map((pt, i) => (i === 0 ? 'M' : 'L') + mapX(pt[0]).toFixed(1) + ',' + mapY(pt[1]).toFixed(1)).join(' ');
+  const bandPath = upper.map((pt, i) => (i === 0 ? 'M' : 'L') + mapX(pt[0]).toFixed(1) + ',' + mapY(pt[1]).toFixed(1)).join(' ')
+    + ' ' + lower.slice().reverse().map(pt => 'L' + mapX(pt[0]).toFixed(1) + ',' + mapY(pt[1]).toFixed(1)).join(' ') + ' Z';
+
+  const p = predict(xstar);
+  const qx = mapX(xstar), qyMean = mapY(p.mean), qyUp = mapY(p.mean + 2 * p.std), qyDown = mapY(p.mean - 2 * p.std);
+
+  let svgHtml = '';
+
+  // Grid lines
+  const xTicks = 6;
+  for (let i = 0; i <= xTicks; i++) {
+    const v = xRange[0] + (xRange[1] - xRange[0]) * i / xTicks;
+    const px = mapX(v);
+    svgHtml += `<line x1="${px}" y1="${PX.y0}" x2="${px}" y2="${PX.y1}" stroke="#1a2230" stroke-width="0.5"/>`;
+    const label = pInfo.max - pInfo.min < 1 ? v.toFixed(2) : Math.round(v);
+    svgHtml += `<text x="${px}" y="${PX.y0 + 18}" text-anchor="middle" font-size="11" fill="#6b7684" font-family="Inter,sans-serif">${label}</text>`;
+  }
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const v = yRange[0] + (yRange[1] - yRange[0]) * i / yTicks;
+    const py = mapY(v);
+    svgHtml += `<line x1="${PX.x0}" y1="${py}" x2="${PX.x1}" y2="${py}" stroke="#1a2230" stroke-width="0.5"/>`;
+    svgHtml += `<text x="${PX.x0 - 10}" y="${py + 4}" text-anchor="end" font-size="11" fill="#6b7684" font-family="Inter,sans-serif">${v.toFixed(currentTarget === 'elongation' ? 1 : 0)}</text>`;
+  }
+
+  // Axes
+  svgHtml += `<line x1="${PX.x0}" y1="${PX.y0}" x2="${PX.x1}" y2="${PX.y0}" stroke="#2a3545" stroke-width="1"/>`;
+  svgHtml += `<line x1="${PX.x0}" y1="${PX.y0}" x2="${PX.x0}" y2="${PX.y1}" stroke="#2a3545" stroke-width="1"/>`;
+
+  // Axis labels
+  svgHtml += `<text x="${(PX.x0 + PX.x1) / 2}" y="${PX.y0 + 40}" text-anchor="middle" font-size="12" fill="#7c8a9a" font-family="Inter,sans-serif">${pInfo.desc} (${pInfo.unit})</text>`;
+  svgHtml += `<text x="16" y="${(PX.y0 + PX.y1) / 2}" text-anchor="middle" font-size="12" fill="#7c8a9a" font-family="Inter,sans-serif" transform="rotate(-90 16 ${(PX.y0 + PX.y1) / 2})">${tInfo.desc} (${tInfo.unit})</text>`;
+
+  // Uncertainty band
+  svgHtml += `<path d="${bandPath}" fill="#4da6ff" fill-opacity="0.14" stroke="none"/>`;
+  // Mean curve
+  svgHtml += `<path d="${meanPath}" fill="none" stroke="#3ddcac" stroke-width="2.5" stroke-linecap="round"/>`;
+
+  // Training points
+  const { X, Y } = getActiveData();
+  X.forEach((xi, i) => {
+    svgHtml += `<line x1="${mapX(xi)}" y1="${mapY(Y[i])}" x2="${mapX(xi)}" y2="${PX.y0}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2 3" opacity="0.35"/>`;
+    svgHtml += `<circle cx="${mapX(xi)}" cy="${mapY(Y[i])}" r="6" fill="#f59e0b" stroke="#0a0e14" stroke-width="1.5"/>`;
+    svgHtml += `<text x="${mapX(xi)}" y="${mapY(Y[i]) - 12}" text-anchor="middle" font-size="10" fill="#f59e0b" font-family="JetBrains Mono,monospace" opacity="0.7">x${i + 1}</text>`;
+  });
+
+  // Query guideline + point + error bar
+  svgHtml += `<line x1="${qx}" y1="${PX.y0}" x2="${qx}" y2="${PX.y1}" stroke="#ff8a5c" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>`;
+  svgHtml += `<line x1="${qx}" y1="${qyUp}" x2="${qx}" y2="${qyDown}" stroke="#ff8a5c" stroke-width="2.5" stroke-linecap="round"/>`;
+  svgHtml += `<circle cx="${qx}" cy="${qyMean}" r="7" fill="#ff8a5c" stroke="#0a0e14" stroke-width="2"/>`;
+  svgHtml += `<text x="${qx + 12}" y="${qyMean - 6}" font-size="11" fill="#ff8a5c" font-family="JetBrains Mono,monospace" font-weight="600">x*</text>`;
+
+  svg.innerHTML = svgHtml;
+  return p;
+}
+
+// ─── MATRIX DISPLAY ─────────────────────────────────────────────────────
+function renderMatrices() {
+  const { K, Kinv } = state;
+  const fmt = (m, label) => {
+    let html = `<div style="font-size:12px;color:#7c8a9a;margin-top:10px;margin-bottom:4px;">${label}</div>`;
+    html += '<table class="mtx">';
+    m.forEach((row, i) => {
+      html += '<tr>' + row.map((v, j) =>
+        `<td class="${i === j ? 'diag' : ''}">${v.toFixed(2)}</td>`
+      ).join('') + '</tr>';
+    });
+    html += '</table>';
+    return html;
+  };
+  document.getElementById('matrices').innerHTML =
+    fmt(K, 'K — kernel matrix (Matérn similarities + WhiteKernel noise σ²_n on diagonal)') +
+    fmt(Kinv, 'K⁻¹ — its inverse (this is what "solving" the model means — sklearn uses Cholesky L L^T = K)');
+}
+
+// ─── BAL ACQUISITION BARS ───────────────────────────────────────────────
+// Shows the domain-range-normalized uncertainty for the current x*,
+// exactly as stage_04_acquisition.py _evaluate_grid_uncertainty() computes.
+function renderBALBars(xstar) {
+  const container = document.getElementById('bal-bars');
+  const p = PARAMS[currentParam];
+  let html = '';
+
+  // For each target, compute σ and normalize by domain range
+  Object.entries(TARGETS).forEach(([tName, tInfo]) => {
+    const savedTarget = currentTarget;
+    currentTarget = tName;
+    rebuildModel(
+      parseFloat(document.getElementById('ctl-l').value),
+      parseFloat(document.getElementById('ctl-sf').value),
+      parseFloat(document.getElementById('ctl-n').value)
+    );
+    const pred = predict(xstar);
+    const rawSigma = pred.std;
+    const normalizedSigma = rawSigma / tInfo.range;
+    const barPct = Math.min(100, normalizedSigma * 500); // Scale for visibility
+
+    const color = tName === 'tension_strenght' ? '#3ddcac' : tName === 'roughness' ? '#4da6ff' : '#a78bfa';
+
+    html += `
+      <div class="bal-bar-row">
+        <span class="bar-label">${tName.replace('_', ' ').substring(0, 10)}</span>
+        <div class="bal-bar-track">
+          <div class="bal-bar-fill" style="width:${barPct}%;background:${color};"></div>
+        </div>
+        <span class="bar-val">σ/R = ${normalizedSigma.toFixed(4)}</span>
+      </div>`;
+    currentTarget = savedTarget;
+  });
+
+  // Re-rebuild for current target
+  rebuildModel(
+    parseFloat(document.getElementById('ctl-l').value),
+    parseFloat(document.getElementById('ctl-sf').value),
+    parseFloat(document.getElementById('ctl-n').value)
+  );
+
+  html += `<div style="margin-top:8px;font-size:11px;color:var(--amber);font-family:var(--mono);">
+    Σ(σ/range) = acquisition score — higher = Stage 04 would sample here first
+  </div>`;
+  container.innerHTML = html;
+}
+
+// ─── COMPUTATION TRACE ──────────────────────────────────────────────────
+function buildTraceRows(xstar, p) {
+  const { X, Y } = getActiveData();
+  const pInfo = PARAMS[currentParam];
+  const tInfo = TARGETS[currentTarget];
+  const rows = [];
+
+  // Query point
+  rows.push({
+    group: 'query',
+    html: `<span class="m">query point:</span> x* = ${xstar.toFixed(1)} ${pInfo.unit}` +
+      `<span class="code-ref">stage_04 → gpr.predict(x_scaled)</span>` +
+      `<span class="note">We're asking: "what ${tInfo.desc.toLowerCase()} do we predict at ${pInfo.desc.toLowerCase()} = ${xstar.toFixed(1)}${pInfo.unit}?"</span>`
+  });
+
+  // Distance & kernel similarity for each training point
+  X.forEach((xi, i) => {
+    const d = Math.abs(xstar - xi);
+    rows.push({
+      group: 'similarity',
+      html: `distance to x${i + 1} (${pInfo.desc}=${xi}${pInfo.unit}, ${currentTarget}=${Y[i]}${tInfo.unit}): d = |${xstar.toFixed(1)} − ${xi}| = <span class="k">${d.toFixed(2)}</span>` +
+        `<span class="note">Matérn(ν=2.5) kernel: k*(x*, x${i + 1}) = σ²_f × (1 + √5·d/ℓ + 5d²/(3ℓ²)) × exp(−√5·d/ℓ) = <span class="k">${p.kStar[i].toFixed(4)}</span>` +
+        ` — closer training points get higher kernel similarity</span>`
+    });
+  });
+
+  // Weighted sum terms
+  X.forEach((xi, i) => {
+    const term = p.kStar[i] * state.alpha[i];
+    rows.push({
+      group: 'weighted',
+      html: `term ${i + 1}: k*_${i + 1} × α_${i + 1} = ${p.kStar[i].toFixed(4)} × <span class="a">${state.alpha[i].toFixed(4)}</span> = <span class="m">${term.toFixed(4)}</span>` +
+        (i === 0 ? `<span class="code-ref">α = K⁻¹ y</span><span class="note">α was solved once by inverting K — it can be negative because this is not a simple average. In the pipeline, sklearn stores this as gpr.alpha_ after gpr.fit()</span>` : '')
+    });
+  });
+
+  // Sum = prediction
+  rows.push({
+    group: 'weighted',
+    html: `Σ all terms → <span class="m">μ(x*) = ${p.mean.toFixed(2)} ${tInfo.unit}</span>` +
+      `<span class="code-ref">gpr.predict(X_new)</span>` +
+      `<span class="note">This weighted sum is the predicted ${tInfo.desc.toLowerCase()} — like a weighted average, but the weights α come from solving the full kernel matrix, not from counting</span>`
+  });
+
+  // Uncertainty computation
+  rows.push({
+    group: 'uncertainty',
+    html: `k(x*,x*) = σ²_f (ConstantKernel) = <span class="k">${p.kss.toFixed(2)}</span>` +
+      `<span class="note">The model's maximum possible variance before seeing any data</span>`
+  });
+  rows.push({
+    group: 'uncertainty',
+    html: `correction term: k*ᵀ K⁻¹ k* = <span class="k">${p.correction.toFixed(2)}</span>` +
+      `<span class="note">How much of the prior uncertainty the ${X.length} training points have already explained away at this location</span>`
+  });
+  rows.push({
+    group: 'uncertainty',
+    html: `σ²(x*) = ${p.kss.toFixed(2)} − ${p.correction.toFixed(2)} = <span class="m">${Math.max(0, p.kss - p.correction).toFixed(2)}</span>`
+  });
+  rows.push({
+    group: 'uncertainty',
+    html: `σ(x*) = √σ²(x*) = <span class="m">${p.std.toFixed(2)} ${tInfo.unit}</span>` +
+      `<span class="code-ref">return_std=True</span>` +
+      `<span class="note">This σ is exactly what Stage 04's BAL acquisition hunts for — regions where σ is high mean the GPR doesn't know, and that's where the next batch of 100 points will be sampled</span>`
+  });
+
+  // Domain-range normalized for BAL
+  const normSigma = p.std / tInfo.range;
+  rows.push({
+    group: 'bal',
+    html: `<span class="a">BAL normalized:</span> σ/range = ${p.std.toFixed(2)} / ${tInfo.range} = <span class="a">${normSigma.toFixed(5)}</span>` +
+      `<span class="code-ref">_TARGET_DOMAIN_RANGES</span>` +
+      `<span class="note">Stage 04 divides σ by domain range so roughness (µm, range 0–500) doesn't dominate tension_strength (MPa, range 0–100) in the acquisition signal. This produces a fair, unit-free exploration score.</span>`
+  });
+
+  return rows;
+}
+
+function renderTraceInstant(rows) {
+  document.getElementById('trace').innerHTML = rows.map(r =>
+    `<div class="trace-row in" data-group="${r.group}">${r.html}</div>`
+  ).join('');
+}
+function renderTraceAnimated(rows) {
+  const el = document.getElementById('trace');
+  el.innerHTML = rows.map(r =>
+    `<div class="trace-row" data-group="${r.group}">${r.html}</div>`
+  ).join('');
+  const items = el.querySelectorAll('.trace-row');
+  items.forEach((it, i) => setTimeout(() => it.classList.add('in'), i * 220));
+}
+
+// ─── WIRING ─────────────────────────────────────────────────────────────
+const ctlX = document.getElementById('ctl-x');
+const ctlL = document.getElementById('ctl-l');
+const ctlSf = document.getElementById('ctl-sf');
+const ctlN = document.getElementById('ctl-n');
+
+function updateSliderConfig() {
+  const p = PARAMS[currentParam];
+  ctlX.min = p.min;
+  ctlX.max = p.max;
+  ctlX.step = (p.max - p.min) < 1 ? 0.005 : 0.5;
+  ctlX.value = p.mid;
+  document.getElementById('unit-x').textContent = p.unit;
+
+  // Update appropriate length scale for the parameter range
+  const paramRange = p.max - p.min;
+  const goodL = paramRange * 0.25;
+  ctlL.min = paramRange * 0.02;
+  ctlL.max = paramRange * 1.0;
+  ctlL.step = paramRange * 0.005;
+  ctlL.value = goodL;
+}
+
+function fullUpdate(animate) {
+  rebuildModel(parseFloat(ctlL.value), parseFloat(ctlSf.value), parseFloat(ctlN.value));
+  const xstar = parseFloat(ctlX.value);
+  const p = render(xstar);
+  renderMatrices();
+  const rows = buildTraceRows(xstar, p);
+  if (animate) renderTraceAnimated(rows); else renderTraceInstant(rows);
+
+  const tInfo = TARGETS[currentTarget];
+  document.getElementById('res-mean').textContent = p.mean.toFixed(2);
+  document.getElementById('res-unc').textContent = '± ' + (2 * p.std).toFixed(2);
+  document.getElementById('res-mean-unit').textContent = tInfo.unit;
+  document.getElementById('res-unc-unit').textContent = tInfo.unit;
+
+  document.getElementById('lbl-x').textContent = parseFloat(ctlX.value).toFixed(PARAMS[currentParam].max < 1 ? 3 : 1);
+  document.getElementById('lbl-l').textContent = parseFloat(ctlL.value).toFixed(1);
+  document.getElementById('lbl-sf').textContent = ctlSf.value;
+  document.getElementById('lbl-n').textContent = parseFloat(ctlN.value).toFixed(2);
+
+  // Update held-info text
+  const heldParams = Object.entries(PARAMS)
+    .filter(([k]) => k !== currentParam)
+    .map(([k, v]) => `${k.replace(/_/g, ' ')}=${v.mid}${v.unit}`)
+    .join(', ');
+  document.getElementById('held-info').textContent = `others held: ${heldParams}`;
+
+  renderBALBars(xstar);
+}
+
+// Control listeners
+[ctlX, ctlL, ctlSf, ctlN].forEach(el => el.addEventListener('input', () => fullUpdate(false)));
+document.getElementById('run-btn').addEventListener('click', () => fullUpdate(true));
+document.getElementById('reset-btn').addEventListener('click', () => {
+  updateSliderConfig();
+  ctlSf.value = 25; ctlN.value = 0.5;
+  fullUpdate(true);
+});
+
+// Parameter selector
+document.getElementById('param-select').addEventListener('change', (e) => {
+  currentParam = e.target.value;
+  updateSliderConfig();
+  fullUpdate(true);
+});
+
+// Target tabs
+document.querySelectorAll('.target-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.target-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentTarget = tab.dataset.target;
+    fullUpdate(true);
+  });
+});
+
+// Click on plot to move x*
+svg.addEventListener('click', (e) => {
+  const rect = svg.getBoundingClientRect();
+  const scaleX = 660 / rect.width;
+  const px = (e.clientX - rect.left) * scaleX;
+  const { xRange } = getActiveRange();
+  const x = xRange[0] + (px - PX.x0) / (PX.x1 - PX.x0) * (xRange[1] - xRange[0]);
+  const p = PARAMS[currentParam];
+  const clamped = Math.max(p.min, Math.min(p.max, x));
+  ctlX.value = clamped.toFixed(2);
+  fullUpdate(false);
+});
+
+// Initial render
+updateSliderConfig();
+fullUpdate(true);
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEACHING MODE — 17-STEP GUIDED TOUR
+// Maps each step to the actual pipeline stage and code file
+// ═══════════════════════════════════════════════════════════════════════
+
+function animateSlider(el, from, to, duration, cb) {
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    el.value = (from + (to - from) * eased).toFixed(2);
+    fullUpdate(false);
+    if (t < 1) requestAnimationFrame(step); else if (cb) cb();
+  }
+  requestAnimationFrame(step);
+}
+
+function highlightGroup(group) {
+  document.querySelectorAll('#trace .trace-row').forEach(r => {
+    if (r.dataset.group === group) { r.classList.add('tour-focus'); r.classList.remove('tour-dim'); }
+    else { r.classList.remove('tour-focus'); r.classList.add('tour-dim'); }
+  });
+  const first = document.querySelector(`#trace .trace-row[data-group="${group}"]`);
+  if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function clearGroupHighlight() {
+  document.querySelectorAll('#trace .trace-row').forEach(r => r.classList.remove('tour-focus', 'tour-dim'));
+}
+
+function setPipelineStage(stageNum) {
+  document.querySelectorAll('.pipe-stage').forEach(s => s.classList.remove('active'));
+  if (stageNum) {
+    const stages = Array.isArray(stageNum) ? stageNum : [stageNum];
+    stages.forEach(n => {
+      const el = document.querySelector(`.pipe-stage.s${n}`);
+      if (el) el.classList.add('active');
+    });
+  }
+}
+
+const TOUR_STEPS = [
+  {
+    target: null,
+    stage: null,
+    title: 'Welcome to the FDM Digital Twin GPR Teaching Mode',
+    text: "We'll walk through exactly how our pipeline turns 25 real print measurements into 10,000 synthetic data points — one calculation at a time. Every number on this page is computed live using the same Matérn(ν=2.5) kernel, same formulas, and same variables as stage_03_surrogate.py and stage_04_acquisition.py.",
+  },
+  {
+    target: '#pipeline-bar',
+    stage: [1, 2],
+    title: 'Step 1 — The Pipeline: Stages 01 & 02',
+    text: "The pipeline starts by downloading real FDM print data from Kaggle (Stage 01: stage_01_ingestion.py) and cleaning it (Stage 02: stage_02_cleaning.py). The result is ~25 real Ultimaker S5 measurements — 5 input parameters (nozzle_temperature, print_speed, layer_height, infill_density, fan_speed) and 3 output targets (tension_strenght, roughness, elongation). These are the yellow dots on the plot.",
+  },
+  {
+    target: '#panel-plot',
+    stage: [3],
+    title: 'Step 2 — The Training Data (25 Kaggle Measurements)',
+    text: "These yellow dots are real measurements from an Ultimaker S5 3D printer printing PLA. Each dot represents: a specific print setting (x-axis) and its measured outcome (y-axis). That's ALL the model is ever given. The green curve and blue band are entirely inferred from just these points by Stage 03's GPR.",
+  },
+  {
+    target: '#param-select',
+    stage: [3],
+    title: 'Step 3 — The 5D Design Space',
+    text: "The real GPR operates in 5 dimensions simultaneously: nozzle_temperature (180–230°C), print_speed (20–70mm/s), layer_height (0.1–0.3mm), infill_density (20–100%), fan_speed (0–100%). Since we can't draw 5D on screen, we slice through one axis at a time while holding the others at their midpoints. Try switching parameters in the dropdown!",
+  },
+  {
+    target: '#panel-plot',
+    stage: [3],
+    title: 'Step 4 — Why GPR? (Distribution Over Functions)',
+    text: "Unlike a simple curve fit (which gives ONE line), GPR computes a DISTRIBUTION over all possible functions that could explain the data. The green line is the most likely function (the mean μ), and the blue band is the 95% confidence interval (±2σ). This is why our pipeline literally knows what it doesn't know.",
+  },
+  {
+    target: '#ctrlbox-l',
+    stage: [3],
+    title: 'Step 5 — The Kernel: ConstantKernel × Matérn(ν=2.5) + WhiteKernel',
+    text: "In _construct_kernel() from stage_03_surrogate.py, we define: ConstantKernel(1.0, bounds: 1e-3 to 1e7) × Matérn(ν=2.5, length_scale_bounds: 1e-2 to 1e3) + WhiteKernel(noise_level_bounds: 1e-15 to 1.0). The ConstantKernel (σ²_f slider) controls amplitude. The Matérn (ℓ slider) controls how far correlation reaches. ν=2.5 means physics is smooth but not infinitely differentiable — ideal for FDM. The WhiteKernel (σ²_n slider) handles measurement noise — it's LEARNED via log-marginal likelihood, not hardcoded. alpha=1e-6 in the code is for Cholesky stability only.",
+  },
+  {
+    target: '#details-matrices',
+    stage: [3],
+    onEnter: () => { document.getElementById('details-matrices').open = true; },
+    title: 'Step 6 — The Kernel Matrix K (Training-to-Training)',
+    text: "Apply the Matérn kernel to every pair of training points and you get the kernel matrix K. Its diagonal has σ²_n (WhiteKernel noise) added — this is what allows the model to NOT pass exactly through noisy data. In the pipeline, sklearn builds this internally when you call gpr.fit(scaled_features, target_vector).",
+  },
+  {
+    target: '#details-matrices',
+    stage: [3],
+    title: 'Step 7 — Solving for α = K⁻¹ y (The Learned Weights)',
+    text: "K⁻¹ is the inverse of the kernel matrix. Multiply it by the measured outputs y, and you get α — one weight per training point. This is \"solving the model\" (sklearn stores it as gpr.alpha_). Notice weights can be NEGATIVE — this is not a simple average. normalize_y=True in our code centers y to zero-mean first, which improves the optimizer landscape.",
+  },
+  {
+    target: '#ctrlbox-x',
+    stage: [4],
+    onEnter: () => {
+      const p = PARAMS[currentParam];
+      const gapPoint = p.min + (p.max - p.min) * 0.55;
+      animateSlider(ctlX, parseFloat(ctlX.value), gapPoint, 600, () => fullUpdate(false));
+    },
+    title: 'Step 8 — Pick a Query Point x* (A New Print Setting)',
+    text: "Now we ask the GPR to predict at a brand-new setting x* — one the printer has never tested. This is exactly what Stage 04 does: it generates 50,000 Sobol candidate points across the 5D space and asks the GPR to predict at each one. Watch x* slide to a gap between training points.",
+  },
+  {
+    target: '#panel-trace',
+    stage: [3],
+    onEnter: () => highlightGroup('similarity'),
+    title: 'Step 9 — Distance & Kernel Similarity k*(x*, xᵢ)',
+    text: "For each training point, compute the distance d = |x* − xᵢ|, then feed it into Matérn(ν=2.5): k* = σ²_f × (1 + √5·d/ℓ + 5d²/(3ℓ²)) × exp(−√5·d/ℓ). This gives the kernel similarity — how relevant each training point is to THIS specific prediction. Closer points get higher similarity. This vector k* is what the pipeline computes in gpr.predict().",
+  },
+  {
+    target: '#panel-trace',
+    stage: [3],
+    onEnter: () => highlightGroup('weighted'),
+    title: 'Step 10 — The Weighted Sum: μ(x*) = Σ kᵢ × αᵢ',
+    text: "Multiply each kernel similarity k*ᵢ by its matching weight αᵢ, sum all products, and that's μ(x*) — the predicted mean. Points that are BOTH close to x* AND heavily weighted contribute most. This is what gpr.predict(X_new) returns as the first output.",
+  },
+  {
+    target: '#panel-trace',
+    stage: [3, 4],
+    onEnter: () => highlightGroup('uncertainty'),
+    title: 'Step 11 — Uncertainty: σ²(x*) = σ²_f − k*ᵀ K⁻¹ k*',
+    text: "Start from σ²_f (ConstantKernel — the prior variance), then subtract how much the training data has explained away (the correction term k*ᵀ K⁻¹ k*). The remainder is σ²(x*). Its square root σ(x*) is the ±2σ band on the plot. This is what gpr.predict(X_new, return_std=True) returns as the second output — and it's the ENTIRE basis of BAL.",
+  },
+  {
+    target: '#panel-plot',
+    stage: [3],
+    onEnter: () => {
+      clearGroupHighlight();
+      const { X } = getActiveData();
+      animateSlider(ctlX, parseFloat(ctlX.value), X[2], 700, () => fullUpdate(false));
+    },
+    title: 'Step 12 — Near Real Data: σ Shrinks (Model Is Confident)',
+    text: "Slide x* right onto a training point. Watch the blue band pinch almost to nothing — σ(x*) drops close to zero. Right at measured data, the correction term k*ᵀ K⁻¹ k* nearly equals σ²_f, so the leftover uncertainty vanishes. The model is confident here because it HAS real data.",
+  },
+  {
+    target: '#panel-plot',
+    stage: [4],
+    onEnter: () => {
+      const { X } = getActiveData();
+      const gap = (X[2] + X[3]) / 2;
+      animateSlider(ctlX, parseFloat(ctlX.value), gap, 700, () => fullUpdate(false));
+    },
+    title: 'Step 13 — In the Gap: σ Grows (BAL Would Sample Here!)',
+    text: "Now slide to the widest gap between training points. The band balloons outward — σ(x*) spikes. This is EXACTLY the spot Stage 04 would choose to test next. High σ means the model doesn't know → acquire data here → σ collapses → the model learns. This is the BAL loop.",
+  },
+  {
+    target: '#panel-bal',
+    stage: [4],
+    onEnter: () => highlightGroup('bal'),
+    title: 'Step 14 — BAL Acquisition: Domain-Range Normalization',
+    text: "Stage 04 (stage_04_acquisition.py) evaluates σ across all 3 targets at once. But roughness (µm, range 0–500) would dominate tension_strength (MPa, range 0–100) purely due to units. So _evaluate_grid_uncertainty() divides each σ by its domain range: σ_normalized = σ / range. This comes from _TARGET_DOMAIN_RANGES in the code — producing a fair, unit-free acquisition signal.",
+  },
+  {
+    target: '#panel-bal',
+    stage: [4],
+    title: 'Step 15 — Local Penalization (Batch Diversity)',
+    text: "Without penalization, Stage 04 would pick the same high-σ spot 100 times. Local Penalization (González et al. 2016) adds a Gaussian repulsion bump after each selection: penalized_std = total_std × max(0, 1 − repulsion). The penalty_radius slider in config (default 0.30) controls how far each bump reaches. This forces each of the 100 batch points to probe a DIFFERENT region.",
+  },
+  {
+    target: '#pipeline-bar',
+    stage: [3, 4],
+    title: 'Step 16 — The Loop: Stage 03 ⇄ Stage 04 × 100 Cycles',
+    text: "The BAL loop cycles: Stage 03 trains GPR → Stage 04 acquires 100 new points → append to dataset → retrain GPR → acquire again. Each cycle, σ shrinks as new data fills in the gaps. After ~100 iterations, 10,000 high-quality synthetic rows are produced. The O(n³) cost of GPR means later cycles take hours — that's why the full run is 3–5 days.",
+  },
+  {
+    target: null,
+    stage: [1, 2, 3, 4, 5],
+    onEnter: () => {
+      clearGroupHighlight();
+      setPipelineStage([1, 2, 3, 4, 5]);
+    },
+    title: "You're Ready — The Full Pipeline",
+    text: "That's the whole model: a Matérn(ν=2.5) kernel, a kernel matrix K, a solved weight vector α, a weighted sum prediction μ(x*), and leftover uncertainty σ(x*) that drives the BAL acquisition loop. Stage 05 validates the final dataset through 6 physical checks (row count, NaN, input/output bounds, uncertainty threshold ≤ 20%). Explore freely now — switch parameters, change hyperparameters, or click on the plot!",
+  },
+];
+
+let tourIndex = 0;
+let tourActive = false;
+const spotEl = document.getElementById('tour-spotlight');
+const popupEl = document.getElementById('tour-popup');
+
+function setSpotlight(selector) {
+  if (!selector) { spotEl.classList.remove('active'); return; }
+  const el = document.querySelector(selector);
+  if (!el) { spotEl.classList.remove('active'); return; }
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  const place = () => {
+    const r = el.getBoundingClientRect();
+    const pad = 10;
+    spotEl.style.top = (r.top - pad) + 'px';
+    spotEl.style.left = (r.left - pad) + 'px';
+    spotEl.style.width = (r.width + pad * 2) + 'px';
+    spotEl.style.height = (r.height + pad * 2) + 'px';
+    spotEl.classList.add('active');
+  };
+  place();
+  setTimeout(place, 400);
+}
+
+function tourShow(i) {
+  tourIndex = Math.max(0, Math.min(TOUR_STEPS.length - 1, i));
+  const step = TOUR_STEPS[tourIndex];
+  document.getElementById('tour-count').textContent = `STEP ${tourIndex + 1} / ${TOUR_STEPS.length}`;
+  document.getElementById('tour-title').textContent = step.title;
+  document.getElementById('tour-text').textContent = step.text;
+  document.getElementById('tour-back').style.visibility = tourIndex === 0 ? 'hidden' : 'visible';
+  document.getElementById('tour-next').textContent = tourIndex === TOUR_STEPS.length - 1 ? 'Finish' : 'Next';
+
+  clearGroupHighlight();
+  setSpotlight(step.target);
+  if (step.stage) setPipelineStage(step.stage);
+  if (step.onEnter) step.onEnter();
+}
+
+function startTour() {
+  tourActive = true;
+  document.body.style.overflow = 'hidden';
+  popupEl.classList.add('active');
+  tourShow(0);
+}
+function endTour() {
+  tourActive = false;
+  document.body.style.overflow = '';
+  popupEl.classList.remove('active');
+  spotEl.classList.remove('active');
+  clearGroupHighlight();
+  setPipelineStage([3, 4]);
+  updateSliderConfig();
+  ctlSf.value = 25; ctlN.value = 0.5;
+  fullUpdate(true);
+}
+
+document.getElementById('tour-start').addEventListener('click', startTour);
+document.getElementById('tour-skip').addEventListener('click', endTour);
+document.getElementById('tour-next').addEventListener('click', () => {
+  if (tourIndex >= TOUR_STEPS.length - 1) endTour(); else tourShow(tourIndex + 1);
+});
+document.getElementById('tour-back').addEventListener('click', () => tourShow(tourIndex - 1));
+window.addEventListener('resize', () => { if (tourActive) setSpotlight(TOUR_STEPS[tourIndex].target); });
+</script>
+</body>
+</html>

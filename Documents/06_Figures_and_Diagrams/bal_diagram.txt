@@ -1,0 +1,490 @@
+# Image Generation Prompt — Bayesian Active Learning (BAL) Mathematical Pipeline
+
+Use this with NanoBanana / Napkin AI to generate a publication-quality diagram showing exactly how the BAL optimization loop works mathematically, step by step, across all ~100 iterations.
+
+---
+
+## DIAGRAM: Bayesian Active Learning — Complete Cyclical Optimization Pipeline
+
+**Style**: Large multi-section diagram on a dark background (#0D1117). The primary visual should be a cyclical loop with clear entry/exit points. Each stage within the loop is a detailed labeled box. Show mathematical equations, code variable names, matrix dimensions, and data volumes at every stage. Use color coding: purple (#7B61FF) for the cycle itself, green (#00FFC3) for data artifacts, orange (#FFC107) for decision points, cyan (#00D4FF) for the optimizer. Modern technical aesthetic — think research poster figure.
+
+**Title** (top center, large bold):
+`Bayesian Active Learning (BAL) — Cyclical Optimization Loop`
+
+**Subtitle**:
+`stage_03_fit_gpr ↔ stage_04_acquire — From 25 Real Rows to 10,000 Synthetic Rows`
+
+---
+
+## SECTION 1: THE OUTER LOOP ARCHITECTURE
+
+**Show as a large circular/oval loop in the center of the diagram, with an entry point and an exit point.**
+
+```
+                         ┌─────────────────────────────┐
+                         │    PipelineDirector          │
+                    ┌───→│    .direct_traffic()         │───┐
+                    │    │    "bal_rows < 10,000?"      │   │
+                    │    └─────────────────────────────┘   │
+                    │         │ YES              │ NO      │
+                    │         ▼                  ▼         │
+                    │    ┌──────────┐    ┌──────────────┐  │
+                    │    │ Stage 03 │    │   Stage 05   │  │
+                    │    │ GPR FIT  │    │  VALIDATION  │  │
+                    │    └────┬─────┘    └──────────────┘  │
+                    │         │                            │
+                    │         ▼                            │
+                    │    ┌──────────┐                      │
+                    │    │ Stage 04 │                      │
+                    │    │ ACQUIRE  │──────────────────────┘
+                    │    └────┬─────┘
+                    │         │
+                    └─────────┘
+```
+
+**Label each loop iteration with:**
+- **Entry condition**: `bal_rows_generated < TARGET_ROWS (10,000)`
+- **Exit condition**: `bal_rows_generated >= TARGET_ROWS (10,000)`
+- **Total iterations**: `~100 (10,000 rows / 100 per batch)`
+- **Time per iteration**: `~5-8 minutes (dominated by differential_evolution)`
+- **Total runtime**: `~10-14 hours`
+
+**Code (router decision in pipeline_director.py):**
+```python
+elif current_stage == "stage_04_acquire":
+    current_volume = state.get("bal_rows_generated", 0)
+    if current_volume < self.bal_target:      # bal_target = 10,000
+        return "stage_03_fit_gpr"             # ← LOOP BACK
+    else:
+        return "stage_05_physics_check"       # ← EXIT LOOP
+```
+
+---
+
+## SECTION 2: ITERATION 0 — SOBOL QUASI-RANDOM COLD START
+
+**Box color**: Cyan header (#00D4FF)
+**Label**: "Iteration 0 — Sobol Cold Start (No GPR Uncertainty Available)"
+
+**Content:**
+
+```
+PROBLEM: On the first BAL cycle, the GPR was trained on only 25 real PLA rows.
+         It has no reliable uncertainty map yet. We can't "hunt blind spots"
+         because the model doesn't know where the blind spots ARE.
+
+SOLUTION: Use a Sobol quasi-random sequence to fill the 5D design space uniformly.
+
+═══════════════════════════════════════════════════════════════════════════
+
+SOBOL SEQUENCE (low-discrepancy quasi-random):
+
+  Unlike pseudo-random sampling, Sobol sequences guarantee:
+  • Every sub-region of the space gets covered
+  • No clumping or gaps
+  • Deterministic with seed = 42
+
+  ┌───────────────────────────────────────────────────────────────────┐
+  │  5D Unit Hypercube [0,1]⁵:                                      │
+  │                                                                   │
+  │  Sobol(d=5, scramble=True, seed=42).random(n=128)[:100]          │
+  │                                                                   │
+  │  Why 128? → Sobol requires powers of 2                           │
+  │  ceil(log₂(100)) = 7 → 2⁷ = 128 → take first 100               │
+  │                                                                   │
+  │  Output: unit_matrix ∈ ℝ^(100 × 5), values in [0, 1]            │
+  └───────────────────────────────────────────────────────────────────┘
+
+  SCALE TO PHYSICAL BOUNDS:
+
+    X_physical[i,j] = lower_j + unit_matrix[i,j] × (upper_j - lower_j)
+
+    ┌──────────────────────┬─────────┬─────────┬─────────────────────┐
+    │ Feature              │ Lower   │ Upper   │ Example scaled value│
+    ├──────────────────────┼─────────┼─────────┼─────────────────────┤
+    │ nozzle_temperature   │ 180 °C  │ 230 °C  │ 180 + 0.62 × 50    │
+    │                      │         │         │   = 211 °C          │
+    │ print_speed          │ 20 mm/s │ 70 mm/s │ 20 + 0.34 × 50     │
+    │                      │         │         │   = 37 mm/s         │
+    │ layer_height         │ 0.1 mm  │ 0.3 mm  │ 0.1 + 0.78 × 0.2   │
+    │                      │         │         │   = 0.256 mm        │
+    │ infill_density       │ 20 %    │ 100 %   │ 20 + 0.45 × 80     │
+    │                      │         │         │   = 56 %            │
+    │ fan_speed            │ 0 %     │ 100 %   │ 0 + 0.91 × 100     │
+    │                      │         │         │   = 91 %            │
+    └──────────────────────┴─────────┴─────────┴─────────────────────┘
+
+  Output: 100 uniformly distributed physical coordinates
+
+  ┌────────────────────────────────────────────────────────────┐
+  │  Visual: Show a 2D scatter plot (e.g. nozzle vs speed):   │
+  │                                                            │
+  │  speed ↑                                                   │
+  │   70   │  •    •       •    •     •      •                 │
+  │        │     •    •        •   •     •                     │
+  │   45   │  •      •   •       •    •    •   •               │
+  │        │    •  •     •    •      •  •                      │
+  │   20   │  •     •       •    •      •    •                 │
+  │        └───────────────────────────────────→ nozzle        │
+  │        180        205        230                           │
+  │                                                            │
+  │  → Uniformly distributed (no clusters, no gaps)            │
+  └────────────────────────────────────────────────────────────┘
+```
+
+**Code:**
+```python
+sampler = Sobol(d=len(self.features), scramble=True, seed=seed)
+unit_matrix = sampler.random(n=sample_size)[:batch_size]
+physical_matrix[:, i] = lo + unit_matrix[:, i] * (hi - lo)
+```
+
+---
+
+## SECTION 3: ITERATION 1–99 — THE ACTIVE HUNT
+
+**Box color**: Purple header (#7B61FF)
+**Label**: "Iterations 1–99 — Active Uncertainty Hunting"
+
+**Show as 4 sequential sub-steps inside a large box, connected by arrows:**
+
+### Sub-step A: LOAD RETRAINED GPR
+```
+Input from Stage 03:
+  • 3 trained GPR models (tension, roughness, elongation)
+  • 1 fitted StandardScaler
+  • Feature & target column names
+
+  Loaded from: data/processed/gpr_surrogate_model.pkl
+
+  The GPR was JUST retrained on the growing dataset:
+    Cycle 1:  trained on   125 rows (25 real + 100 Sobol)
+    Cycle 2:  trained on   225 rows (25 real + 200 synthetic)
+    Cycle 10: trained on 1,025 rows (25 real + 1,000 synthetic)
+    Cycle 50: trained on 5,025 rows (25 real + 5,000 synthetic)
+    Cycle 99: trained on 9,925 rows (25 real + 9,900 synthetic)
+```
+
+### Sub-step B: CALCULATE SCALED BOUNDS
+```
+Transform physical hardware limits to StandardScaler space:
+
+                 lower_j - μ_j            upper_j - μ_j
+  bound_low_j = ─────────────── ,  bound_high_j = ───────────────
+                     σ_j                              σ_j
+
+  These scaled bounds define the search space for differential_evolution.
+  The optimizer ONLY explores within these boundaries.
+
+Code:
+  self.bounds_scaled = [
+      ((lo - self.scaler.mean_[i]) / self.scaler.scale_[i],
+       (hi - self.scaler.mean_[i]) / self.scaler.scale_[i])
+      for i, (lo, hi) in enumerate(self.bounds_physical)
+  ]
+```
+
+### Sub-step C: SEQUENTIAL GREEDY ACQUISITION (100 points per batch)
+```
+For point j = 1 to 100 in the current batch:
+
+  ┌───────────────────────────────────────────────────────────────────┐
+  │                                                                   │
+  │  1. MAXIMIZE total uncertainty across all 3 targets:              │
+  │                                                                   │
+  │                   3                                                │
+  │     σ_total(x) = Σ  σᵢ(x)                                       │
+  │                  i=1                                               │
+  │                                                                   │
+  │     Where σᵢ(x) = GPRᵢ.predict(x, return_std=True)[1]           │
+  │                                                                   │
+  │  ─────────────────────────────────────────────────────────────    │
+  │                                                                   │
+  │  2. APPLY Local Penalization to avoid duplicates in this batch:   │
+  │                                                                   │
+  │                        j-1                                        │
+  │     P(x) = max(0, 1 - Σ  exp(-‖x - xₖ‖² / 2r²))               │
+  │                        k=1                                        │
+  │                                                                   │
+  │     r = penalty_radius = 0.3 (in standardized space)             │
+  │     xₖ = previously selected points in THIS batch                │
+  │                                                                   │
+  │  ─────────────────────────────────────────────────────────────    │
+  │                                                                   │
+  │  3. COMBINED acquisition function:                                │
+  │                                                                   │
+  │     α(x) = σ_total(x) × P(x)                                    │
+  │                                                                   │
+  │     Optimizer minimizes f(x) = -α(x)                             │
+  │     (negative because scipy minimizes)                            │
+  │                                                                   │
+  └───────────────────────────────────────────────────────────────────┘
+
+  Visual for Local Penalization (show step by step):
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │                                                                  │
+  │  Point j=1 (no penalization):                                    │
+  │    • Finds x with highest σ_total                                │
+  │    • P(x) = 1 (no previous points to repel from)                │
+  │                                                                  │
+  │  Point j=2 (one repulsion zone):                                 │
+  │    • Gaussian "bump" placed at x₁ with radius r=0.3             │
+  │    • Near x₁: P(x) ≈ 0 → suppressed                            │
+  │    • Far from x₁: P(x) ≈ 1 → allowed                           │
+  │                                                                  │
+  │  Point j=50 (49 repulsion zones):                                │
+  │    • 49 overlapping Gaussian bumps across scaled space           │
+  │    • Optimizer forced to find gaps between ALL previous points   │
+  │    • Results in a diverse, spread-out batch                      │
+  │                                                                  │
+  │  Point j=100 (99 repulsion zones):                               │
+  │    • Entire high-uncertainty region is well-covered              │
+  │    • Remaining α(x) values are small → diminishing returns       │
+  │                                                                  │
+  └──────────────────────────────────────────────────────────────────┘
+```
+
+### Sub-step D: DIFFERENTIAL EVOLUTION OPTIMIZER
+```
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  scipy.optimize.differential_evolution                           │
+  │                                                                  │
+  │  TYPE: Population-based evolutionary metaheuristic               │
+  │  WHY:  Works on non-differentiable, multi-modal objective        │
+  │        functions — the GPR uncertainty landscape has many local  │
+  │        maxima, so gradient methods would get stuck               │
+  │                                                                  │
+  │  ┌───────────────────────────────────────────────────┐           │
+  │  │ Population:    8 candidate solutions (popsize=8)  │           │
+  │  │ Mutation:      (0.5, 1.0) — dithered              │           │
+  │  │ Recombination: 0.7 — crossover probability        │           │
+  │  │ Max iters:     100 per point                      │           │
+  │  │ Tolerance:     1e-4 convergence                   │           │
+  │  │ Seed:          42 + iteration (deterministic)     │           │
+  │  │                                                   │           │
+  │  │  Runs 100 TIMES per BAL cycle                     │           │
+  │  │  (once per point, sequential greedy)              │           │
+  │  └───────────────────────────────────────────────────┘           │
+  │                                                                  │
+  │  ALGORITHM:                                                      │
+  │  ┌─────────────┐                                                 │
+  │  │ Initialize   │ 8 random candidates within scaled bounds       │
+  │  └──────┬──────┘                                                 │
+  │         ▼                                                        │
+  │  ┌─────────────┐                                                 │
+  │  │ Mutate       │ v = x_r1 + F·(x_r2 - x_r3), F ∈ [0.5, 1.0]  │
+  │  └──────┬──────┘                                                 │
+  │         ▼                                                        │
+  │  ┌─────────────┐                                                 │
+  │  │ Crossover    │ mix mutant v with parent x, prob = 0.7         │
+  │  └──────┬──────┘                                                 │
+  │         ▼                                                        │
+  │  ┌─────────────┐                                                 │
+  │  │ Select       │ keep child if f(child) < f(parent)             │
+  │  └──────┬──────┘                                                 │
+  │         ▼                                                        │
+  │  ┌─────────────┐                                                 │
+  │  │ Converged?   │ → YES: return best x* → NO: loop (max 100)    │
+  │  └─────────────┘                                                 │
+  │                                                                  │
+  │  Output: x*_scaled — the point with maximum penalized σ          │
+  └──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## SECTION 4: POST-ACQUISITION — PREDICT, ACCUMULATE, EXPORT
+
+**Box color**: Green header (#00FFC3)
+**Label**: "After Each Batch — Synthetic Row Assembly + Ledger Growth"
+
+```
+STEP 1: INVERSE TRANSFORM (scaled → physical):
+  X_physical = scaler.inverse_transform(acquired_scaled_points)   # (100, 5)
+  Clip to hardware limits: nozzle [180,230], speed [20,70], etc.
+
+STEP 2: PREDICT OUTPUTS (use GPR posterior mean):
+  For each of 100 new coordinates:
+    GPR₁(x*) → µ_tension    (MPa)     + σ_tension
+    GPR₂(x*) → µ_roughness  (µm)      + σ_roughness
+    GPR₃(x*) → µ_elongation (%)       + σ_elongation
+
+STEP 3: BUILD DATAFRAME:
+  ┌────────────┬──────┬──────┬────────┬─────┬─────────┬─────────┬──────────┐
+  │nozzle_temp │speed │layer │infill  │fan  │tension  │roughness│elongation│
+  │  (input)   │(inp) │(inp) │(inp)   │(inp)│(pred µ) │(pred µ) │(pred µ)  │
+  ├────────────┼──────┼──────┼────────┼─────┼─────────┼─────────┼──────────┤
+  │  211.3     │37.1  │0.256 │56.2    │91.0 │ 38.4    │  15.7   │  6.2     │
+  │  195.8     │52.4  │0.148 │83.7    │45.3 │ 44.1    │  10.2   │  9.8     │
+  │  ...       │...   │...   │...     │...  │ ...     │  ...    │  ...     │
+  └────────────┴──────┴──────┴────────┴─────┴─────────┴─────────┴──────────┘
+  + hidden columns: _std_tension, _std_roughness, _std_elongation
+
+STEP 4: ACCUMULATE INTO LEDGER:
+  df_ledger = concat(existing_data, new_batch)   # grows by 100 each cycle
+
+STEP 5: EXPORT:
+  Strip _std_ columns → save public CSV → data/processed/bal_synthetic_10k.csv
+  Serialize full df_ledger to JSON → store in state["bal_accumulated_data"]
+```
+
+---
+
+## SECTION 5: DATASET GROWTH TIMELINE
+
+**Show as a horizontal timeline bar chart:**
+
+```
+DATASET VOLUME OVER BAL ITERATIONS:
+
+Iteration  Dataset used for GPR training        Rows    Source
+─────────  ──────────────────────────────────   ─────   ──────────────────
+  INIT     data/interim/pla_cleaned.csv           25    Real Kaggle data
+  0        pla_cleaned.csv (GPR fit)              25    ← GPR trained here
+  0        Sobol cold-start output               100    Sobol quasi-random
+─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  1        bal_synthetic_10k.csv (accumulated)   100    ← GPR retrained
+  1        Active hunt output                    100    Differential Evol.
+─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  2        bal_synthetic_10k.csv (accumulated)   200    ← GPR retrained
+  2        Active hunt output                    100    Differential Evol.
+─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  10       bal_synthetic_10k.csv                1,000   ← GPR retrained
+  25       bal_synthetic_10k.csv                2,500   ← GPR retrained
+  50       bal_synthetic_10k.csv                5,000   ← GPR retrained
+  75       bal_synthetic_10k.csv                7,500   ← GPR retrained
+  99       bal_synthetic_10k.csv                9,900   ← GPR retrained
+  99       Active hunt output                    100   → 10,000 TOTAL
+─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  EXIT     Router: bal_rows >= 10,000          10,000  → Stage 05 Validation
+
+GROWTH VISUALIZATION (bar chart):
+
+  Rows ↑
+  10,000 │                                          ████████
+         │                                     █████████████
+         │                                █████████████████
+   5,000 │                          ██████████████████████
+         │                    ████████████████████████████
+         │              ██████████████████████████████████
+   1,000 │        █████████████████████████████████████████
+     100 │   ████████████████████████████████████████████████
+      25 │ ██████████████████████████████████████████████████
+         └──┬────┬────┬────┬────┬────┬────┬────┬────┬────┬──→ Iteration
+            0   10   20   30   40   50   60   70   80   99
+```
+
+---
+
+## SECTION 6: CONVERGENCE & UNCERTAINTY REDUCTION
+
+**Box color**: Cyan header (#00D4FF)
+**Label**: "Convergence Behavior — How σ Decreases Over Iterations"
+
+```
+WHY BAL WORKS — THE FEEDBACK LOOP:
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │                                                                      │
+  │  Cycle N:                                                            │
+  │    1. GPR trained on N×100 rows                                     │
+  │    2. σ(x) is HIGH in unexplored regions of 5D space               │
+  │    3. Acquisition function finds 100 points with highest σ          │
+  │    4. GPR predicts µ and σ at these points                          │
+  │    5. These 100 rows are ADDED to the training dataset              │
+  │                                                                      │
+  │  Cycle N+1:                                                          │
+  │    1. GPR retrained on (N+1)×100 rows — MORE data                  │
+  │    2. σ(x) DECREASES in the regions we just sampled                 │
+  │    3. σ(x) remains HIGH in regions we haven't reached yet          │
+  │    4. Acquisition function picks 100 NEW points in unexplored areas │
+  │    5. Repeat until the entire 5D space is well-covered              │
+  │                                                                      │
+  └──────────────────────────────────────────────────────────────────────┘
+
+UNCERTAINTY CURVE (show as a line plot):
+
+  Mean σ ↑
+         │╲
+         │  ╲
+         │    ╲
+         │      ╲
+         │        ╲
+         │          ╲
+         │            ╲───╲
+         │                  ╲───╲
+         │                        ╲───╲───╲───╲───── → converges
+         └──────────────────────────────────────────→ Iteration
+         0    10    20    30    40    50    60   99
+
+  • Early iterations: σ drops rapidly (easy gains, large unexplored regions)
+  • Mid iterations: σ drops moderately (filling in gaps)
+  • Late iterations: σ plateaus (design space well-covered, diminishing returns)
+
+  Logged to: data/processed/bal_uncertainty_log.csv
+  Columns: [iteration, target_variable, mean_sigma]
+
+THE KEY INSIGHT:
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                                                                     │
+  │  Traditional random sampling: needs ~100,000 points to cover 5D    │
+  │  BAL active learning: needs only ~10,000 points                    │
+  │                                                                     │
+  │  WHY? Because BAL STRATEGICALLY places points where the model      │
+  │  is most uncertain, instead of randomly scattering them.           │
+  │  Each point provides MAXIMUM INFORMATION GAIN.                     │
+  │                                                                     │
+  │  The Local Penalization ensures BATCH DIVERSITY within each cycle, │
+  │  and the GPR retraining ensures GLOBAL EXPLORATION across cycles.  │
+  │                                                                     │
+  └─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## COMPLETE SINGLE-ITERATION WALKTHROUGH
+
+**Show as a numbered step-by-step flow at the bottom of the diagram:**
+
+```
+SINGLE BAL ITERATION (e.g., Cycle 25):
+
+  ┌─────────┐     ┌─────────────┐     ┌──────────────┐     ┌───────────┐
+  │ LOAD    │     │ RETRAIN     │     │ HUNT 100     │     │ PREDICT   │
+  │ 2,500   │ ──→ │ 3× GPR on   │ ──→ │ BLIND SPOTS  │ ──→ │ µ, σ at   │
+  │ rows    │     │ 2,500 rows  │     │ max-var +    │     │ 100 new   │
+  │ from CSV│     │ (Matérn,    │     │ local penal. │     │ points    │
+  │         │     │  CV R²)     │     │ + diff. evol.│     │           │
+  └─────────┘     └─────────────┘     └──────────────┘     └─────┬─────┘
+                                                                  │
+  ┌─────────┐     ┌─────────────┐     ┌──────────────┐          │
+  │ EXPORT  │     │ UPDATE      │     │ APPEND       │          │
+  │ 2,600   │ ←── │ STATE:      │ ←── │ 100 new rows │ ←────────┘
+  │ rows to │     │ iter=26     │     │ to ledger    │
+  │ CSV     │     │ rows=2,600  │     │ (concat)     │
+  └─────────┘     └─────────────┘     └──────────────┘
+
+  Router check: 2,600 < 10,000 → LOOP BACK to Stage 03
+```
+
+---
+
+## CONFIGURATION REFERENCE TABLE
+
+| Parameter | Value | Source File | Purpose |
+|-----------|-------|-------------|---------|
+| target_rows | 10,000 | printer_params.yaml | Total synthetic rows to generate |
+| batch_size | 100 | printer_params.yaml | Rows per BAL iteration |
+| n_initial_points | 200 | printer_params.yaml | Sobol seed points (unused, batch_size used) |
+| penalty_radius | 0.3 | printer_params.yaml | Local Penalization exclusion radius |
+| random_seed | 42 | printer_params.yaml | Reproducibility (incremented per cycle) |
+| uncertainty_threshold | 0.20 | printer_params.yaml | Max σ as fraction of output range (Stage 05) |
+| DE maxiter | 100 | stage_04_acquisition.py | Differential evolution iterations per point |
+| DE popsize | 8 | stage_04_acquisition.py | Evolutionary population size |
+| DE mutation | (0.5, 1.0) | stage_04_acquisition.py | Dithered mutation factor |
+| DE recombination | 0.7 | stage_04_acquisition.py | Crossover probability |
+| GPR alpha | 0.01 | stage_03_surrogate.py | Noise regularization |
+| GPR restarts | 10 | stage_03_surrogate.py | Kernel optimizer restarts |
+| CV folds | 5 | stage_03_surrogate.py | Cross-validation splits |

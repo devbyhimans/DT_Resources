@@ -1,0 +1,477 @@
+# Image Generation Prompt — GPR Mathematical Pipeline (Detailed & Labeled)
+
+Use this with NanoBanana / Napkin AI to generate a publication-quality diagram showing exactly how the Gaussian Process Regression works in this codebase, step by step, with all mathematical operations labeled.
+
+---
+
+## DIAGRAM: GPR + Bayesian Active Learning — Complete Mathematical Pipeline
+
+**Style**: Wide horizontal flow diagram, reading left-to-right. Dark background (#0D1117). Each computational step is a large labeled box with a colored top header bar. Inside each box, show: the mathematical equation, the code variable names, and the matrix dimensions. Connect boxes with thick directional arrows labeled with the transformation name. Use a technical/academic aesthetic — think research paper figure, but with modern dark-mode styling. All text should be crisp and legible.
+
+**Title** (top center, large bold text):
+`Gaussian Process Regression — Mathematical Pipeline`
+
+**Subtitle**:
+`Stage 03 (fit_surrogate_model) + Stage 04 (run_active_acquisition) — Complete Computation Graph`
+
+---
+
+### STEP 1: RAW INPUT MATRIX
+**Box color**: Green header (#00FFC3)
+**Label**: "Step 1 — Input Data Loading"
+**Code source**: `GaussianProcessEngine._ingest_assets()`
+
+**Content inside the box:**
+
+```
+Source File: data/interim/pla_cleaned.csv  (or bal_synthetic_10k.csv on BAL re-entry)
+
+Feature Matrix X                          Target Vectors y
+┌─────────────────────────────────────┐   ┌──────────────────────────────────────────┐
+│ nozzle_temp  print_speed  layer_ht  │   │ tension_strenght   roughness   elongation│
+│   infill     fan_speed              │   │    (MPa)             (µm)        (%)     │
+└─────────────────────────────────────┘   └──────────────────────────────────────────┘
+
+X ∈ ℝ^(n × 5)                            y₁, y₂, y₃ ∈ ℝ^(n × 1)
+
+Initial n = 25 (cleaned PLA rows)
+After BAL: n grows by 100 per cycle up to 10,000
+
+Code:
+  feature_matrix = self.training_corpus[self.feature_cols].values    # shape: (n, 5)
+  target_vector  = self.training_corpus[target].values               # shape: (n,)
+```
+
+**Arrow to next box**: "StandardScaler.fit_transform(X)"
+
+---
+
+### STEP 2: FEATURE NORMALIZATION
+**Box color**: Blue header (#4DA6FF)
+**Label**: "Step 2 — StandardScaler Normalization"
+**Code source**: `GaussianProcessEngine.execute_training_sequence()`
+
+**Content inside the box:**
+
+```
+Z-score standardization (zero mean, unit variance):
+
+              X_j - μ_j
+  X̃_j  =  ─────────────
+                σ_j
+
+Where for each feature column j:
+  μ_j = mean(X_j)    ← stored in self.scaler.mean_[j]
+  σ_j = std(X_j)     ← stored in self.scaler.scale_[j]
+
+┌─────────────────────────────────────┐     ┌─────────────────────────────────────┐
+│ X (physical space)                  │ ──→ │ X̃ (scaled space)                   │
+│ nozzle: 180–230 °C                  │     │ nozzle: ~ -1.5 to +1.5             │
+│ speed: 20–70 mm/s                   │     │ speed: ~ -1.5 to +1.5              │
+│ layer: 0.1–0.3 mm                   │     │ layer: ~ -1.5 to +1.5              │
+│ infill: 20–100 %                    │     │ infill: ~ -1.5 to +1.5             │
+│ fan: 0–100 %                        │     │ fan: ~ -1.5 to +1.5                │
+└─────────────────────────────────────┘     └─────────────────────────────────────┘
+
+Code:
+  scaled_features = self.scaler.fit_transform(feature_matrix)       # shape: (n, 5)
+
+NOTE: The scaler is saved in the pickle and reused in Stage 04 for
+      inverse_transform() back to physical Ultimaker S5 space.
+```
+
+**Arrow to next box**: "Construct kernel K(x, x')"
+
+---
+
+### STEP 3: MATÉRN KERNEL CONSTRUCTION
+**Box color**: Purple header (#7B61FF)
+**Label**: "Step 3 — Kernel Function k(x, x')"
+**Code source**: `GaussianProcessEngine._construct_kernel()`
+
+**Content inside the box:**
+
+```
+Composite Kernel:
+
+  k(x, x') = σ²_f · k_Matérn(x, x')
+
+Where:
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                                                                     │
+  │  Matérn kernel (ν = 5/2):                                          │
+  │                                                                     │
+  │                    ┌           √5·d      5·d²  ┐        ┌  √5·d  ┐ │
+  │  k_M(x,x') =  1 · │ 1  +  ────────  +  ─────  │ · exp  │- ─────  ││
+  │                    │            l        3·l²   │        │    l    ││
+  │                    └                            ┘        └        ┘ │
+  │                                                                     │
+  │  d = ‖x - x'‖₂  (Euclidean distance in scaled space)              │
+  │  l = length_scale (optimized, init=1.0, bounds=[0.01, 100])        │
+  │                                                                     │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  ConstantKernel:
+    σ²_f = signal variance (optimized, init=1.0, bounds=[0.001, 1000])
+
+Code:
+  ConstantKernel(1.0, (1e-3, 1e3)) * Matern(
+      length_scale=1.0,
+      length_scale_bounds=(1e-2, 1e2),
+      nu=2.5
+  )
+
+Why ν = 2.5?
+  → Twice differentiable (smooth but not infinitely smooth)
+  → Ideal for physical manufacturing processes
+  → More realistic than RBF (ν → ∞) for FDM data
+```
+
+**Arrow to next box**: "gpr.fit(X̃, y) — Optimize kernel hyperparameters"
+
+---
+
+### STEP 4: GPR TRAINING (LOG-MARGINAL-LIKELIHOOD OPTIMIZATION)
+**Box color**: Orange header (#FFC107)
+**Label**: "Step 4 — Model Training via MLE"
+**Code source**: `gpr.fit(scaled_features, target_vector)`
+
+**Content inside the box:**
+
+```
+Objective: Maximize the Log-Marginal-Likelihood
+
+  log p(y | X̃, θ) = -½ · yᵀ(K + σ²_n·I)⁻¹y  -  ½·log|K + σ²_n·I|  -  n/2·log(2π)
+
+  Where:
+    K       = kernel matrix K(X̃, X̃)  ∈ ℝ^(n × n)     ← each entry is k(x̃ᵢ, x̃ⱼ)
+    σ²_n    = noise variance (alpha = 0.01 in code)    ← regularization
+    I       = identity matrix  ∈ ℝ^(n × n)
+    θ       = {σ²_f, l}  (hyperparameters to optimize)
+    n       = number of training points
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  Optimization: L-BFGS-B (gradient-based)                           │
+  │  n_restarts_optimizer = 10 (avoids local minima)                   │
+  │  random_state = 42 (reproducibility)                                │
+  │                                                                      │
+  │  Learns:                                                             │
+  │    • σ²_f  → how much the function varies overall                   │
+  │    • l     → how quickly correlations decay with distance            │
+  └──────────────────────────────────────────────────────────────────────┘
+
+This runs 3 TIMES — one independent GPR per output target:
+  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+  │ GPR₁             │  │ GPR₂             │  │ GPR₃             │
+  │ tension_strenght │  │ roughness        │  │ elongation       │
+  │ (MPa)            │  │ (µm)             │  │ (%)              │
+  └──────────────────┘  └──────────────────┘  └──────────────────┘
+
+Code:
+  gpr = GaussianProcessRegressor(kernel=..., n_restarts_optimizer=10, alpha=1e-2)
+  gpr.fit(scaled_features, target_vector)
+  train_r2 = gpr.score(scaled_features, target_vector)   # Training R²
+```
+
+**Arrow to next box**: "cross_val_score(gpr, X̃, y, cv=5)"
+
+---
+
+### STEP 5: 5-FOLD CROSS-VALIDATION
+**Box color**: Cyan header (#00D4FF)
+**Label**: "Step 5 — Model Validation (5-Fold CV R²)"
+**Code source**: `cross_val_score(gpr, scaled_features, target_vector, cv=5, scoring='r2')`
+
+**Content inside the box:**
+
+```
+Data is split into 5 folds:
+
+  ┌──────┬──────┬──────┬──────┬──────┐
+  │Fold 1│Fold 2│Fold 3│Fold 4│Fold 5│
+  └──────┴──────┴──────┴──────┴──────┘
+
+  Iteration 1: Train on [2,3,4,5]  → Test on [1]  → R²₁
+  Iteration 2: Train on [1,3,4,5]  → Test on [2]  → R²₂
+  Iteration 3: Train on [1,2,4,5]  → Test on [3]  → R²₃
+  Iteration 4: Train on [1,2,3,5]  → Test on [4]  → R²₄
+  Iteration 5: Train on [1,2,3,4]  → Test on [5]  → R²₅
+
+               R²₁ + R²₂ + R²₃ + R²₄ + R²₅
+  Mean CV R² = ─────────────────────────────────
+                            5
+
+                    Σ(yᵢ - ŷᵢ)²
+  Where R² = 1  -  ─────────────
+                    Σ(yᵢ - ȳ)²
+
+  • R² = 1.0  → perfect prediction
+  • R² = 0.0  → predicts the mean
+  • R² < 0.0  → worse than the mean (underfitting — common with 25 rows)
+
+Stored as:
+  self.cv_metrics[target] = mean_cv        # e.g. {"tension_strenght": -0.277, ...}
+  state["surrogate_r2_score"] = overall mean across all 3 targets
+```
+
+**Arrow to next box**: "gpr.predict(X̃*, return_std=True)"
+
+---
+
+### STEP 6: POSTERIOR PREDICTION WITH UNCERTAINTY
+**Box color**: Purple header (#7B61FF)
+**Label**: "Step 6 — GPR Posterior: µ(x*) ± σ(x*)"
+**Code source**: `gpr.predict(scaled_features, return_std=True)`
+
+**Content inside the box:**
+
+```
+For a new (unseen) input point x*:
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                                                                         │
+  │  Predictive Mean:                                                       │
+  │    µ(x*) = k(x*, X̃) · [K(X̃, X̃) + σ²_n·I]⁻¹ · y                    │
+  │                                                                         │
+  │  Predictive Variance:                                                   │
+  │    σ²(x*) = k(x*, x*) - k(x*, X̃) · [K(X̃, X̃) + σ²_n·I]⁻¹ · k(X̃, x*)│
+  │                                                                         │
+  │  Predictive Standard Deviation:                                         │
+  │    σ(x*) = √σ²(x*)                                                     │
+  │                                                                         │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  Interpretation (show as a bell curve / Gaussian illustration):
+
+    • µ(x*) = "best guess" for the output value at this print setting
+    • σ(x*) = "confidence" — HOW UNCERTAIN the model is at this point
+
+    LOW σ  → model is confident (near training data)
+    HIGH σ → model is uncertain (far from training data — EXPLORE HERE!)
+
+  ┌─────────────────────────────────────────────────────┐
+  │  Show a 2D plot sketch:                             │
+  │                                                     │
+  │    y ↑      ╭─── µ(x*) ± 2σ(x*) confidence band   │
+  │      │   ╭──╯    (shaded area)                      │
+  │      │  ╱ ●  ●                                      │
+  │      │ ╱       ╲    ← wide band = high uncertainty  │
+  │      │╱  ●      ╲                                   │
+  │      ●────────────●──→ x                            │
+  │      training      unexplored                       │
+  │      points        region                           │
+  └─────────────────────────────────────────────────────┘
+
+Code (in Stage 04):
+  mean_arr, std_arr = model.predict(x_scaled_for_pred, return_std=True)
+  df_new[target_name]          = mean_arr     # predicted value
+  df_new[f"_std_{target_name}"] = std_arr     # uncertainty
+
+Stored in state:
+  gpr_uncertainty_stats = {
+      "tension_strenght": mean_sigma,
+      "roughness": mean_sigma,
+      "elongation": mean_sigma
+  }
+```
+
+**Arrow to next box**: "Acquisition Function — WHERE to sample next?"
+
+---
+
+### STEP 7: BAL ACQUISITION FUNCTION (MAX-VARIANCE + LOCAL PENALIZATION)
+**Box color**: Red-Orange header (#FF6B35)
+**Label**: "Step 7 — Bayesian Active Learning Acquisition"
+**Code source**: `AcquisitionEngine._evaluate_objective()` + `execute_active_hunt()`
+
+**Content inside the box (this is the largest box — show in detail):**
+
+```
+GOAL: Find the next 100 input points where the GPR is MOST UNCERTAIN
+      → These are the most informative points to "query" next
+
+═══════════════════════════════════════════════════════════════════
+ACQUISITION FUNCTION:  α(x) = σ_total(x) · P(x)
+═══════════════════════════════════════════════════════════════════
+
+  PART A — Maximum Variance (Uncertainty Sampling):
+
+    σ_total(x) = Σ σᵢ(x)     for i ∈ {tension, roughness, elongation}
+                 ᵢ₌₁³
+
+    → Sum the standard deviations from all 3 GPR models at point x
+    → Points with the HIGHEST total σ are the most "interesting"
+
+  ──────────────────────────────────────────────────────────────────
+
+  PART B — Local Penalization (Batch Diversity):
+
+    For the j-th point in the batch, penalize proximity to
+    all previously selected points {x₁, ..., x_{j-1}}:
+
+                     j-1
+    P(x) = max(0,  1 - Σ  exp( -‖x - xₖ‖² / (2r²) ))
+                     k=1
+
+    Where:
+      r = penalty_radius = 0.3 (in standardized space)
+      ‖x - xₖ‖² = squared Euclidean distance to previously picked point
+
+    → Gaussian "bump" repulsion around each already-selected point
+    → Forces the batch to SPREAD OUT across the design space
+    → Prevents the optimizer from picking 100 nearly-identical points
+
+  ──────────────────────────────────────────────────────────────────
+
+  COMBINED OBJECTIVE (minimized by differential_evolution):
+
+    minimize  f(x) = -σ_total(x) · P(x)
+
+    → Negative because scipy minimizes, but we want to MAXIMIZE uncertainty
+    → P(x) ≈ 1 far from previous points (no penalty)
+    → P(x) ≈ 0 near previous points (fully suppressed)
+
+  ──────────────────────────────────────────────────────────────────
+
+  OPTIMIZER: scipy.optimize.differential_evolution
+    ┌─────────────────────────────────────────────┐
+    │ Population-based evolutionary algorithm      │
+    │ bounds = scaled space for each feature       │
+    │ maxiter = 100                                │
+    │ tol = 1e-4                                   │
+    │ popsize = 8                                  │
+    │ mutation = (0.5, 1.0)                        │
+    │ recombination = 0.7                          │
+    │                                              │
+    │ Runs 100 TIMES per batch                     │
+    │ (once per point, sequential greedy)          │
+    └─────────────────────────────────────────────┘
+
+  COLD START (iteration 0 only):
+    → No GPR uncertainty map exists yet
+    → Uses Sobol quasi-random sequence instead
+    → Scrambled, low-discrepancy space-filling
+    → Covers the 5D design space uniformly
+```
+
+**Show a visual sketch inside this box:**
+```
+  ┌──────────────────────────────────────────────────┐
+  │                                                  │
+  │  5D Design Space (projected to 2D for visual):   │
+  │                                                  │
+  │    ●  = training data (low σ)                    │
+  │    ★  = selected acquisition points (high σ)     │
+  │    ○  = repulsion zones (radius r=0.3)           │
+  │                                                  │
+  │     ●    ●                                       │
+  │           ╲                                      │
+  │     ●   ●  ╲  ★₁ ←(highest σ)                   │
+  │              ○╌╌╌╌╌○                             │
+  │                       ★₂ ←(high σ, far from ★₁) │
+  │                    ○╌╌╌╌╌○                       │
+  │          ★₃ ←(high σ, far from ★₁ and ★₂)       │
+  │                                                  │
+  └──────────────────────────────────────────────────┘
+```
+
+**Arrow to next box**: "scaler.inverse_transform(X̃*) → physical space"
+
+---
+
+### STEP 8: INVERSE TRANSFORM + OUTPUT GENERATION
+**Box color**: Green header (#00FFC3)
+**Label**: "Step 8 — Back to Physical Space + Synthetic Row Assembly"
+**Code source**: `run_active_acquisition()` lines 179–204
+
+**Content inside the box:**
+
+```
+TRANSFORM BACK:
+
+  X_physical = X̃_scaled · σ + μ     (per feature)
+
+  Then clip to hardware limits:
+    nozzle_temperature:  clip to [180, 230] °C
+    print_speed:         clip to [20, 70] mm/s
+    layer_height:        clip to [0.1, 0.3] mm
+    infill_density:      clip to [20, 100] %
+    fan_speed:           clip to [0, 100] %
+
+Code:
+  physical_points = self.scaler.inverse_transform(acquired_scaled_points)
+  physical_points[:, i] = np.clip(physical_points[:, i], lo, hi)
+
+═══════════════════════════════════════════════════════════════════
+
+PREDICT OUTPUT VALUES at these new physical coordinates:
+
+  For each new point x*:
+    GPR₁(x*) → µ_tension,  σ_tension       (MPa)
+    GPR₂(x*) → µ_roughness, σ_roughness    (µm)
+    GPR₃(x*) → µ_elongation, σ_elongation  (%)
+
+═══════════════════════════════════════════════════════════════════
+
+ASSEMBLE ONE SYNTHETIC ROW:
+
+  ┌────────────┬──────────┬──────────┬────────┬─────┬──────────┬─────────┬──────────┐
+  │ nozzle_temp│print_spd │layer_ht  │infill  │fan  │ tension  │roughness│elongation│
+  │   (input)  │ (input)  │ (input)  │(input) │(in) │ (pred µ) │(pred µ) │(pred µ)  │
+  ├────────────┼──────────┼──────────┼────────┼─────┼──────────┼─────────┼──────────┤
+  │   205.3    │   45.2   │   0.21   │  62    │ 80  │  42.7    │  12.3   │   8.1    │
+  └────────────┴──────────┴──────────┴────────┴─────┴──────────┴─────────┴──────────┘
+
+  × 100 rows per BAL batch
+  × 100 BAL iterations
+  = 10,000 total synthetic rows
+
+ACCUMULATION:
+  df_ledger = concat(existing_data, new_batch)    # grows each cycle
+  Export public columns (strip _std_ prefixes) → bal_synthetic_10k.csv
+
+═══════════════════════════════════════════════════════════════════
+
+THEN THE BAL LOOP REPEATS:
+  → These 10,100 rows (25 real + 100 new) become the training data
+  → GPR is RETRAINED on this larger dataset (Step 1 again)
+  → σ decreases in regions where we just sampled
+  → Next batch explores DIFFERENT uncertain regions
+  → After ~100 cycles: entire design space is well-covered
+```
+
+---
+
+### BOTTOM SECTION: COMPLETE PIPELINE SUMMARY
+**Show as a single horizontal chain with arrows:**
+
+```
+Raw CSV       StandardScaler     Matérn Kernel     MLE Training     CV R²        Predict µ,σ     Acquisition     Physical
+(25 rows) ──→ Z-normalize ───→ k(x,x') ν=2.5 ──→ max log p(y|θ) ─→ 5-fold ──→ µ(x*),σ(x*) ──→ maxσ·P(x) ──→ 100 new rows
+   X,y            X̃              K(X̃,X̃)          fit(X̃,y)        R² score    uncertainty     BAL hunt      inverse_transform
+                                                                                    │                              │
+                                                                                    └──── feeds Stage 05 ──────────┘
+                                                                                           validation
+                                                                     ←──── BAL LOOP (~100×) ────→
+```
+
+---
+
+### HYPERPARAMETERS REFERENCE TABLE (place in a corner):
+
+| Parameter | Value | Code Location |
+|-----------|-------|---------------|
+| Kernel | Matérn, ν = 2.5 | `_construct_kernel()` |
+| Length scale init | 1.0, bounds [0.01, 100] | `Matern()` |
+| Signal variance init | 1.0, bounds [0.001, 1000] | `ConstantKernel()` |
+| Noise (alpha) | 0.01 | `GaussianProcessRegressor(alpha=1e-2)` |
+| Optimizer restarts | 10 | `n_restarts_optimizer=10` |
+| CV folds | 5 | `cross_val_score(cv=5)` |
+| BAL batch size | 100 | `printer_params.yaml` |
+| BAL target | 10,000 rows | `printer_params.yaml` |
+| Penalty radius | 0.3 | `printer_params.yaml` |
+| DE maxiter | 100 | `differential_evolution(maxiter=100)` |
+| DE popsize | 8 | `differential_evolution(popsize=8)` |
+| DE mutation | (0.5, 1.0) | `differential_evolution(mutation=...)` |
+| DE recombination | 0.7 | `differential_evolution(recombination=0.7)` |

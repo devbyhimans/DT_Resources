@@ -1,0 +1,136 @@
+{
+  "01_BAL_and_Bayesian_Optimization": [
+    {
+      "name": "Gonzalez_2016_Batch_Bayesian_Optimization_Local_Penalization.pdf",
+      "preview": "Fractally-organized Connectionist Networks: Conjectures and Preliminary Results Vincenzo De Florio MOSAIC/University of Antwerp and MOSAIC/iMinds research institute Middelheimlaan 1, 2020 Antwerp, Bel..."
+    },
+    {
+      "name": "Khatamsaz_2025_Constrained_Bayesian_Optimization.pdf",
+      "preview": "Towards Autonomous Experimentation: Bayesian Optimization over Problem Formulation Space for Accelerated Alloy Development Danial Khatamsaza,\u2217, Joseph Wagnerb, Brent Velaa, Raymundo Arr\u00b4oyavea,b,c, Do..."
+    },
+    {
+      "name": "Lee_2022_Failure_Averse_Active_Learning.pdf",
+      "preview": "1 Failure-averse Active Learning for Physics-constrained Systems Cheolhei Lee, Xing Wang, Jianguo Wu, and Xiaowei Yue, Senior Member, IEEE Abstract\u2014Active learning is a sub\ufb01eld of machine learning tha..."
+    },
+    {
+      "name": "Li_2026_Bayesian_Optimization_Active_Constraint_Learning.pdf",
+      "preview": "IISE Transactions ISSN: 2472-5854 (Print) 2472-5862 (Online) Journal homepage: www.tandfonline.com/journals/uiie21 Bayesian Optimization with Active Constraint Learning for Advanced Manufacturing Proc..."
+    },
+    {
+      "name": "Nasrin_2023_Active_Learning_Tensile_Properties_FDM.pdf",
+      "preview": "1 Vol.:(0123456789)Scientific Reports | (2023) 13:11460 | https://doi.org/10.1038/s41598-023-38527-6 www.nature.com/scientificreports Active learning for prediction of tensile properties for material ..."
+    },
+    {
+      "name": "Shahriari_2016_Taking_Human_Out_of_Loop_Review_Bayesian_Optimization.pdf",
+      "preview": "INVITED PAPER Taking the Human Out of the Loop: A Review of Bayesian Optimization The paper introduces the reader to Bayesian optimization, highlighting its methodical aspects and showcasing its appli..."
+    }
+  ],
+  "02_Digital_Twins_in_AM": [
+    {
+      "name": "Kantaros_2022_3D_Printing_Digital_Twins_Trends_and_Limitations.pdf",
+      "preview": "/gid00030/gid00035/gid00032/gid00030/gid00038/gid00001/gid00033/gid00042/gid00045/gid00001 /gid00048/gid00043/gid00031/gid00028/gid00047/gid00032/gid00046 Citation: Kantaros, A.; Piromalis, D.; Tsaram..."
+    },
+    {
+      "name": "Multiscale_Digital_Twin_Laser_DED_Process.pdf",
+      "preview": "Simulation Modelling Practice and Theory 132 (2024) 102881 Available online 22 December 2023 1569-190X/\u00c2\u00a9 2023 The Author(s). Published by Elsevier B.V. This is an open access article under the CC BY-..."
+    },
+    {
+      "name": "Shen_2024_Digital_Twins_in_Additive_Manufacturing_Review.pdf",
+      "preview": "Vol.:(0123456789) The International Journal of Advanced Manufacturing Technology (2024) 131:63\u201392 https://doi.org/10.1007/s00170-024-13092-y CRITICAL REVIEW Digital twins in additive manufacturing: a ..."
+    },
+    {
+      "name": "Timms_2025_Agentic_AI_for_Digital_Twin.pdf",
+      "preview": "Agentic AI for Digital Twin Alexander Timms1*, Abigail Langbridge 2*, Antonis Antonopoulos 3, Antonis Mygiakis3, Eleni V oulgari3, Fearghal O\u2019Donncha4 1Department of Bioengineering, Imperial College L..."
+    }
+  ],
+  "03_FDM_Process_Optimization": [
+    {
+      "name": "Fleming_Toolpath_Planning_Continuous_Extrusion_AM.pdf",
+      "preview": "Toolpath Planning for Continuous Extrusion Additive Manufacturing Chlo\u00eb Fleming, Stephanie Walker, Callie Branyan, Austin Nicolai, Geoffrey Hollinger, Yi\u02d8git Meng\u00fc\u00e7 School of Mechanical, Industrial, a..."
+    },
+    {
+      "name": "Maniraj_2026_Optimizing_FDM_Parameters_PLA.pdf",
+      "preview": "ORIGINAL RESEARCH ARTICLE Optimizing Fused Deposition Modeling Process Parameters to Enhance Dimensional Accuracy and Tensile Strength of Bio-based Polylactic Acid in Additive Manufacturing M. Maniraj..."
+    },
+    {
+      "name": "Shen_2025_Review_FDM_Application_Materials_Optimization.pdf",
+      "preview": "Vol.:(0123456789) The International Journal of Advanced Manufacturing Technology (2025) 138:1675\u20131711 https://doi.org/10.1007/s00170-025-15615-7 CRITICAL REVIEW A review of current research and prospe..."
+    }
+  ],
+  "04_Books_and_Foundations": [
+    {
+      "name": "Gibson_2010_Additive_Manufacturing_Technologies_Book.pdf",
+      "preview": "Additive Manufacturing Technologies..."
+    }
+  ],
+  "05_Project_Reports_and_Documentation": [
+    {
+      "name": "Brain_of_Digital_Twin_Documentation.pdf",
+      "preview": "Brain of the Digital Twin System Architecture and Implementation of an Agentic Digital Twin Pipeline using LangGraph, Gaussian Process Regression, and Bayesian Active Learning A detailed technical doc..."
+    },
+    {
+      "name": "FDM_Agentic_Digital_Twin_Complete_Documentation.md",
+      "preview": "# FDM Agentic Digital Twin \u2014 Complete Technical Documentation > **Document Scope:** This document covers every minute detail of the FDM Agentic Digital Twin project \u2014 its concept, architecture, algori..."
+    },
+    {
+      "name": "FDM_Agentic_Digital_Twin_Concepts_for_PPT.md",
+      "preview": "# FDM Agentic Digital Twin \u2014 Concepts for PPT Presentation > **Document Purpose:** Pure conceptual understanding of every idea, theory, and innovation in this project \u2014 designed for presenting to an e..."
+    },
+    {
+      "name": "GPR_and_BAL_PPT_Explanation.md",
+      "preview": "# GPR & BAL \u2014 Simple Explanation for PPT \ud83c\udfaf > **Audience:** Evaluation panel / non-technical audience"
+    },
+    {
+      "name": "honest_assessment.md",
+      "preview": "# Brutal Honest Assessment \u2014 FDM Digital Twin Pipeline ---"
+    },
+    {
+      "name": "main.tex",
+      "preview": "LaTeX source file."
+    },
+    {
+      "name": "Project_Overview_and_Plan_of_Action.pdf",
+      "preview": "Here\u2019s a clear, structured explanation of the document you shared (about Fused Deposition Modelling \u2013 FDM / 3D printing ): \ud83e\udde9 1. What is Additive Manufacturing (AM)? \u25cf AM = building objects layer by la..."
+    },
+    {
+      "name": "results_presentation_script.md",
+      "preview": "# Results Section: Presentation Script & Visual Guide Use this document to structure the **Results** section of your PPT. I have added a simple explanation and a breakdown of the metrics *before* the ..."
+    }
+  ],
+  "06_Figures_and_Diagrams": [
+    {
+      "name": "bal_diagram.txt",
+      "preview": "# Image Generation Prompt \u2014 Bayesian Active Learning (BAL) Mathematical Pipeline Use this with NanoBanana / Napkin AI to generate a publication-quality diagram showing exactly how the BAL optimization..."
+    },
+    {
+      "name": "fig_active_learning_loop.png",
+      "preview": "Figure showing Active Learning Loop."
+    },
+    {
+      "name": "fig_bo_acquisition_surface.png",
+      "preview": "Figure showing Bo Acquisition Surface."
+    },
+    {
+      "name": "fig_frenkel_sintering.png",
+      "preview": "Figure showing Frenkel Sintering."
+    },
+    {
+      "name": "fig_system_architecture.png",
+      "preview": "Figure showing System Architecture."
+    },
+    {
+      "name": "gpr_working.txt",
+      "preview": "# Image Generation Prompt \u2014 GPR Mathematical Pipeline (Detailed & Labeled) Use this with NanoBanana / Napkin AI to generate a publication-quality diagram showing exactly how the Gaussian Process Regre..."
+    }
+  ],
+  "07_Interactive_Simulations": [
+    {
+      "name": "BAL_Sobol_Active_Acquisition_Interactive_Simulator.html",
+      "preview": "<!DOCTYPE html> <html lang=\"en\">"
+    },
+    {
+      "name": "GPR_Surrogate_Model_Interactive_Simulator.html",
+      "preview": "<!DOCTYPE html> <html lang=\"en\">"
+    }
+  ]
+}

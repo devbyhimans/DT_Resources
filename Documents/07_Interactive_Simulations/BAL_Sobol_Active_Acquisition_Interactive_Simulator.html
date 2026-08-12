@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BAL & Sobol — FDM Digital Twin Simulator</title>
+<meta name="description" content="Interactive Bayesian Active Learning and Sobol sequence simulator aligned with the FDM Agentic Digital Twin pipeline.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — FDM Digital Twin BAL Simulator
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg: #0a0e14;
+  --bg2: #0d1219;
+  --panel: #111820;
+  --panel2: #0c1018;
+  --panel-glass: rgba(17, 24, 32, 0.85);
+  --ink: #e2e8f0;
+  --ink2: #f1f5f9;
+  --dim: #7c8a9a;
+  --dim2: #5a6775;
+  --line: #1e2a38;
+  --line2: #253142;
+
+  /* Pipeline stage colors */
+  --stage1: #a78bfa;
+  --stage2: #60a5fa;
+  --stage3: #3ddcac;
+  --stage4: #f59e0b;
+  --stage5: #f87171;
+
+  /* Functional colors */
+  --teal: #3ddcac;
+  --blue: #4da6ff;
+  --amber: #f59e0b;
+  --coral: #ff8a5c;
+  --red: #f87171;
+  --purple: #a78bfa;
+
+  --mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --sans: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.35);
+}
+
+/* ── Reset & Base ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: ''; position: fixed; top: -30%; left: -20%; width: 70%; height: 70%;
+  background: radial-gradient(ellipse, rgba(245,158,11,0.04) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: ''; position: fixed; bottom: -30%; right: -20%; width: 60%; height: 60%;
+  background: radial-gradient(ellipse, rgba(77,166,255,0.03) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+.wrap {
+  max-width: 1280px; margin: 0 auto; padding: 24px 20px 80px; position: relative; z-index: 1;
+}
+
+/* ── Header ────────────────────────────────────────────────────────── */
+.header { margin-bottom: 8px; }
+.header-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.header h1 {
+  font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--amber), var(--coral));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.header .subtitle { font-size: 13px; color: var(--dim); font-weight: 500; margin-top: 2px; font-family: var(--mono); }
+.header .lead { color: var(--dim); font-size: 14px; line-height: 1.65; margin-top: 12px; max-width: 900px; }
+
+#tour-start {
+  background: linear-gradient(135deg, var(--coral), #e06040); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 11px 20px; font-size: 13.5px; font-weight: 600;
+  font-family: var(--sans); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; flex-shrink: 0;
+}
+#tour-start:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,138,92,0.3); }
+
+/* ── Pipeline Progress Bar ─────────────────────────────────────────── */
+.pipeline-bar { display: flex; align-items: center; gap: 0; margin: 20px 0 24px; padding: 14px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; }
+.pipe-stage { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; font-family: var(--mono); color: var(--dim2); white-space: nowrap; }
+.pipe-stage .num { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: var(--line); color: var(--dim2); }
+.pipe-stage.active { color: var(--ink); }
+.pipe-stage.s3.active { background: rgba(61,220,172,0.08); border-color: rgba(61,220,172,0.2); }
+.pipe-stage.s3.active .num { background: var(--stage3); color: #04342c; }
+.pipe-stage.s4.active { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); }
+.pipe-stage.s4.active .num { background: var(--stage4); color: #3a2505; }
+.pipe-arrow { color: var(--line); font-size: 16px; padding: 0 4px; }
+.pipe-arrow.loop { color: var(--amber); font-weight: 700; }
+
+/* ── Variable Glossary ─────────────────────────────────────────────── */
+.glossary { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 22px; font-size: 12.5px; color: var(--dim); padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.glossary b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+.glossary .sep { width: 100%; height: 1px; background: var(--line); margin: 4px 0; }
+
+/* ── Grid Layout ───────────────────────────────────────────────────── */
+.grid { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+.col-left { flex: 1 1 580px; min-width: 340px; }
+.col-right { flex: 1 1 440px; min-width: 340px; }
+
+/* ── Panels ────────────────────────────────────────────────────────── */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 16px; box-shadow: var(--shadow); backdrop-filter: blur(8px); }
+.panel h2 { font-size: 14px; font-weight: 600; margin: 0 0 14px; color: var(--ink2); display: flex; align-items: center; gap: 10px; }
+.panel h2 .tag { font-size: 10px; font-weight: 700; font-family: var(--mono); padding: 3px 8px; border-radius: 4px; letter-spacing: 0.05em; }
+.panel h2 .tag.s4 { background: rgba(245,158,11,0.12); color: var(--amber); }
+.panel h2 span { color: var(--dim); font-weight: 400; font-size: 12px; margin-left: auto; }
+
+/* ── Controls ──────────────────────────────────────────────────────── */
+.controls { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.ctrl { display: flex; flex-direction: column; gap: 4px; }
+.ctrl label { font-size: 12.5px; color: var(--dim); display: flex; justify-content: space-between; align-items: baseline; }
+.ctrl label b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+input[type=range] { width: 100%; accent-color: var(--amber); height: 6px; cursor: pointer; }
+.ctrl .hint { font-size: 11.5px; color: var(--dim2); line-height: 1.4; }
+
+.toggle-group { display: flex; gap: 8px; margin-bottom: 14px; }
+.toggle-btn { flex: 1; padding: 8px; text-align: center; border: 1px solid var(--line); background: transparent; color: var(--dim); border-radius: var(--radius-sm); font-size: 12px; font-family: var(--mono); font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.toggle-btn.active { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: var(--amber); }
+
+button { font-family: var(--sans); font-size: 13px; font-weight: 600; border: none; border-radius: var(--radius-sm); padding: 10px 18px; cursor: pointer; transition: transform 0.15s, box-shadow 0.2s, background 0.2s; }
+button:hover { transform: translateY(-1px); }
+button.primary { background: linear-gradient(135deg, var(--amber), #e08b00); color: #2e1a00; }
+button.secondary { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+.btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+/* ── SVG Plot ──────────────────────────────────────────────────────── */
+.plot-container { position: relative; width: 100%; aspect-ratio: 1; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+svg#plot { width: 100%; height: 100%; display: block; position: absolute; top: 0; left: 0; }
+#heatmap-canvas { width: 100%; height: 100%; display: block; position: absolute; top: 0; left: 0; opacity: 0.6; }
+
+.legend-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 12px; color: var(--dim); }
+.legend-row span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+/* ── Trace ─────────────────────────────────────────────────────────── */
+.trace-container { max-height: 400px; overflow-y: auto; padding-right: 8px; margin-top: 16px; }
+.trace-container::-webkit-scrollbar { width: 6px; }
+.trace-container::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
+.trace-row { opacity: 0; transform: translateY(6px); transition: opacity 0.35s ease, transform 0.35s ease; padding: 9px 0; border-bottom: 1px dashed var(--line); font-family: var(--mono); font-size: 12px; line-height: 1.55; }
+.trace-row.in { opacity: 1; transform: translateY(0); }
+.trace-row .a { color: var(--amber); font-weight: 600; }
+.trace-row .k { color: var(--teal); }
+.trace-row .c { color: var(--coral); }
+.trace-row .note { display: block; color: var(--dim); font-family: var(--sans); font-size: 11.5px; margin-top: 3px; }
+
+/* ── Tour Styles ───────────────────────────────────────────────────── */
+#tour-spotlight { position: fixed; z-index: 9998; pointer-events: none; border: 2px solid var(--amber); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(3,7,11,0.82), 0 0 30px rgba(245,158,11,0.25); transition: all 0.45s cubic-bezier(.4,0,.2,1); opacity: 0; }
+#tour-spotlight.active { opacity: 1; }
+
+#tour-popup { position: fixed; z-index: 9999; left: 50%; bottom: 28px; transform: translateX(-50%); width: min(520px, 92vw); background: #0e151e; border: 1px solid #2c3742; border-radius: 16px; padding: 20px 22px 18px; box-shadow: 0 16px 48px rgba(0,0,0,0.6); opacity: 0; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease; }
+#tour-popup.active { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+#tour-popup .tour-step-count { font-size: 11px; color: var(--amber); font-family: var(--mono); letter-spacing: 0.04em; margin-bottom: 6px; font-weight: 600; }
+#tour-popup h3 { margin: 0 0 8px; font-size: 16px; color: var(--ink2); font-weight: 700; }
+#tour-popup p { margin: 0; font-size: 13.5px; line-height: 1.6; color: #b4bcc6; }
+#tour-popup .tour-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+#tour-popup .tour-nav-btns { display: flex; gap: 8px; }
+#tour-skip { background: none; border: none; color: #5a6775; font-size: 12px; font-family: var(--sans); cursor: pointer; text-decoration: underline; padding: 0; }
+
+.highlight-zone { background: rgba(245,158,11,0.06); box-shadow: inset 3px 0 0 var(--amber); padding-left: 10px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ═══════════════ HEADER ═══════════════ -->
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <h1>BAL & Sobol — Active Acquisition</h1>
+        <div class="subtitle">Dimensions: 2 (Nozzle Temp × Print Speed) &nbsp;|&nbsp; Sequence: Sobol (Low-Discrepancy)</div>
+        <p class="lead">
+          This simulates <b>Stage 04</b> of our pipeline. The goal is to generate new synthetic data points that maximize model uncertainty (exploration) while maintaining batch diversity. Watch how Sobol sequences fill the space and how <b>Gaussian Local Penalization</b> prevents the optimizer from getting stuck picking the same spot 100 times.
+        </p>
+      </div>
+      <button id="tour-start">▶ Start Teaching Mode</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PIPELINE PROGRESS BAR ═══════════════ -->
+  <div class="pipeline-bar">
+    <div class="pipe-stage s3 active"><span class="num">3</span> GPR Surrogate</div>
+    <span class="pipe-arrow loop">⇄</span>
+    <div class="pipe-stage s4 active" id="stage4-badge"><span class="num">4</span> BAL Acquisition</div>
+  </div>
+
+  <!-- ═══════════════ VARIABLE GLOSSARY ═══════════════ -->
+  <div class="glossary">
+    <span><b>GRID_SIZE</b> = Number of candidate points evaluated (50,000 in project, 500 here)</span>
+    <span><b>Sobol Grid</b> = Low-discrepancy sequence ensuring uniform coverage without random clusters</span>
+    <span><b>σ(x)</b> = Aggregated GPR uncertainty at candidate x</span>
+    <div class="sep"></div>
+    <span><b>Greedy Selection</b> = Picking the candidate with the highest current σ(x)</span>
+    <span><b>Local Penalization</b> = Repulsion bump <i>exp(-d² / 2r²)</i> applied to nearby points after a selection</span>
+    <span><b>Penalty Radius (r)</b> = Controls how far the repulsion spreads (default 0.3 in scaled space)</span>
+  </div>
+
+  <!-- ═══════════════ MAIN GRID ═══════════════ -->
+  <div class="grid">
+
+    <!-- ── LEFT COLUMN ─────────────────────────────────────────── -->
+    <div class="col-left">
+      <div class="panel" id="panel-plot">
+        <h2>
+          2D Design Space
+          <span class="tag s4">STAGE 04</span>
+          <span>Nozzle Temp vs Print Speed</span>
+        </h2>
+        
+        <div class="plot-container" id="plot-box">
+          <canvas id="heatmap-canvas"></canvas>
+          <svg id="plot"></svg>
+        </div>
+
+        <div class="legend-row">
+          <span><i class="sw" style="background:#0a0e14; border:1px solid #3ddcac"></i> Existing Data (Stage 03)</span>
+          <span><i class="sw" style="background:rgba(255,255,255,0.4)"></i> Candidate Grid</span>
+          <span><i class="sw" style="background:var(--amber)"></i> Selected Batch Point</span>
+          <span><i class="sw" style="background:transparent; border:1px solid var(--coral)"></i> Penalization Radius</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT COLUMN ────────────────────────────────────────── -->
+    <div class="col-right">
+
+      <div class="panel" id="panel-controls">
+        <h2>
+          Acquisition Engine Controls
+          <span class="tag s4">STAGE 04</span>
+        </h2>
+        
+        <div class="ctrl" id="ctrl-generator">
+          <label style="margin-bottom:6px;">Candidate Grid Generator</label>
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="btn-sobol">Sobol (Low Discrepancy)</button>
+            <button class="toggle-btn" id="btn-random">Pseudo-Random</button>
+          </div>
+          <span class="hint">Sobol guarantees uniform coverage of the 5D space. Random sampling leaves gaps and creates clusters.</span>
+        </div>
+        
+        <div class="controls" style="margin-top:16px;">
+          <div class="ctrl" id="ctrl-grid">
+            <label>GRID_SIZE Candidates <b id="lbl-grid">500</b></label>
+            <input type="range" id="ctl-grid" min="100" max="2000" step="100" value="500">
+          </div>
+          <div class="ctrl" id="ctrl-radius">
+            <label>Penalty Radius <i>r</i> (scaled units) <b id="lbl-radius">0.30</b></label>
+            <input type="range" id="ctl-radius" min="0.05" max="0.80" step="0.05" value="0.30">
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="secondary" id="btn-generate">1. Build Grid & Evaluate</button>
+          <button class="primary" id="btn-bal">2. Run BAL (Select Batch)</button>
+          <button class="secondary" id="btn-reset">Reset</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-trace">
+        <h2>Live Execution Trace</h2>
+        <div class="trace-container" id="trace">
+          <div class="trace-row in"><span class="note">Awaiting execution...</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Tour Overlay -->
+<div id="tour-spotlight"></div>
+<div id="tour-popup">
+  <div class="tour-step-count" id="tour-count">STEP 1 / 10</div>
+  <h3 id="tour-title">Welcome</h3>
+  <p id="tour-text">…</p>
+  <div class="tour-nav">
+    <button id="tour-skip" type="button">skip tour</button>
+    <div class="tour-nav-btns">
+      <button class="secondary" id="tour-back" type="button">Back</button>
+      <button class="primary" id="tour-next" type="button">Next</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   BAL & SOBOL ENGINE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// ─── UTILS ─────────────────────────────────────────────────────────────
+// Halton Sequence (Base 2 and Base 3) for pseudo-Sobol low-discrepancy generation
+function halton(index, base) {
+  let result = 0;
+  let f = 1 / base;
+  let i = index;
+  while (i > 0) {
+    result += f * (i % base);
+    i = Math.floor(i / base);
+    f /= base;
+  }
+  return result;
+}
+
+// ─── STATE ─────────────────────────────────────────────────────────────
+const bounds = { x: [180, 230], y: [20, 70] }; // Nozzle Temp, Print Speed
+// Fake training data to create an uncertainty landscape
+const trainingData = [
+  { x: 190, y: 30 }, { x: 205, y: 45 }, { x: 220, y: 60 },
+  { x: 195, y: 65 }, { x: 225, y: 25 }, { x: 185, y: 50 }
+];
+
+let candidates = [];
+let maxUncertainty = 1;
+let generatorType = 'sobol';
+let selectedBatch = [];
+
+// ─── DOM ───────────────────────────────────────────────────────────────
+const svg = document.getElementById('plot');
+const canvas = document.getElementById('heatmap-canvas');
+const ctx = canvas.getContext('2d');
+const traceEl = document.getElementById('trace');
+
+const ctlGrid = document.getElementById('ctl-grid');
+const ctlRadius = document.getElementById('ctl-radius');
+const lblGrid = document.getElementById('lbl-grid');
+const lblRadius = document.getElementById('lbl-radius');
+
+function logTrace(html, group = '') {
+  const row = document.createElement('div');
+  row.className = `trace-row ${group}`;
+  row.innerHTML = html;
+  traceEl.appendChild(row);
+  setTimeout(() => row.classList.add('in'), 50);
+  traceEl.scrollTop = traceEl.scrollHeight;
+  return row;
+}
+function clearTrace() { traceEl.innerHTML = ''; }
+
+// ─── UNCERTAINTY MODEL (GPR Mock) ───────────────────────────────────────
+// We mock the GPR uncertainty by calculating distance to training points.
+// True GPR variance drops to 0 near training points.
+function calculateUncertainty(x, y) {
+  // Normalize coordinates for fair distance (0 to 1)
+  const nx = (x - bounds.x[0]) / (bounds.x[1] - bounds.x[0]);
+  const ny = (y - bounds.y[0]) / (bounds.y[1] - bounds.y[0]);
+  
+  let minSqDist = Infinity;
+  for (const pt of trainingData) {
+    const tnx = (pt.x - bounds.x[0]) / (bounds.x[1] - bounds.x[0]);
+    const tny = (pt.y - bounds.y[0]) / (bounds.y[1] - bounds.y[0]);
+    const d2 = (nx - tnx)**2 + (ny - tny)**2;
+    if (d2 < minSqDist) minSqDist = d2;
+  }
+  
+  // Uncertainty is high when distance is high, maxes out at 1.0 (sigma_f)
+  // sigma^2(x) = sigma_f^2 - k*^T K^-1 k*.  Approximated by 1 - exp(-d^2 / l^2)
+  const lengthScale = 0.25; // in normalized units
+  const variance = 1.0 - Math.exp(-minSqDist / (lengthScale * lengthScale));
+  return Math.sqrt(Math.max(0, variance)); // Standard deviation
+}
+
+function updateHeatmap() {
+  const w = canvas.parentElement.clientWidth;
+  const h = canvas.parentElement.clientHeight;
+  canvas.width = w; canvas.height = h;
+  
+  const imgData = ctx.createImageData(w, h);
+  const data = imgData.data;
+  
+  for (let py = 0; py < h; py+=2) {
+    for (let px = 0; px < w; px+=2) {
+      const x = bounds.x[0] + (px / w) * (bounds.x[1] - bounds.x[0]);
+      const y = bounds.y[1] - (py / h) * (bounds.y[1] - bounds.y[0]);
+      const u = calculateUncertainty(x, y);
+      
+      // Map uncertainty (0 to 1) to color (Dark Blue -> Teal -> Amber)
+      let r, g, b;
+      if (u < 0.5) {
+        // Dark blue to Teal
+        const t = u * 2;
+        r = 13 + t * (61 - 13);
+        g = 18 + t * (220 - 18);
+        b = 25 + t * (172 - 25);
+      } else {
+        // Teal to Amber
+        const t = (u - 0.5) * 2;
+        r = 61 + t * (245 - 61);
+        g = 220 + t * (158 - 220);
+        b = 172 + t * (11 - 172);
+      }
+      
+      const idx = (py * w + px) * 4;
+      data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = 255;
+      data[idx+4] = r; data[idx+5] = g; data[idx+6] = b; data[idx+7] = 255;
+      const idx2 = ((py+1) * w + px) * 4;
+      if (idx2 < data.length) {
+        data[idx2] = r; data[idx2+1] = g; data[idx2+2] = b; data[idx2+3] = 255;
+        data[idx2+4] = r; data[idx2+5] = g; data[idx2+6] = b; data[idx2+7] = 255;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// ─── RENDERING ─────────────────────────────────────────────────────────
+function mapX(x) { return ((x - bounds.x[0]) / (bounds.x[1] - bounds.x[0])) * 100 + '%'; }
+function mapY(y) { return (100 - ((y - bounds.y[0]) / (bounds.y[1] - bounds.y[0])) * 100) + '%'; }
+
+function renderPlot() {
+  let html = '';
+  
+  // Existing Training Data
+  for (const pt of trainingData) {
+    html += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="5" fill="#0a0e14" stroke="#3ddcac" stroke-width="2"/>`;
+  }
+  
+  // Candidates
+  for (const c of candidates) {
+    // Opacity based on penalized score
+    const op = Math.max(0.1, c.penalizedScore);
+    html += `<circle cx="${mapX(c.x)}" cy="${mapY(c.y)}" r="2.5" fill="rgba(255,255,255,${op})" />`;
+  }
+  
+  // Selected Batch & Penalization Radii
+  const radius = parseFloat(ctlRadius.value);
+  const w = svg.clientWidth;
+  const rPixels = radius * w; // Approximate circular radius assuming square aspect
+  
+  for (let i = 0; i < selectedBatch.length; i++) {
+    const pt = selectedBatch[i];
+    html += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="${rPixels}" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.4)" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+    html += `<circle cx="${mapX(pt.x)}" cy="${mapY(pt.y)}" r="4" fill="#f59e0b" stroke="#000" stroke-width="1"/>`;
+    html += `<text x="${mapX(pt.x)}" y="${mapY(pt.y)}" dx="8" dy="4" fill="#f59e0b" font-family="JetBrains Mono" font-size="11" font-weight="bold">${i+1}</text>`;
+  }
+  
+  svg.innerHTML = html;
+}
+
+// ─── ACTIONS ───────────────────────────────────────────────────────────
+function buildGrid() {
+  clearTrace();
+  selectedBatch = [];
+  candidates = [];
+  const n = parseInt(ctlGrid.value);
+  
+  logTrace(`<span class="a">Step 1: Generating ${n} Candidates</span><span class="note">Method: ${generatorType === 'sobol' ? 'Sobol (Halton)' : 'Pseudo-Random'}</span>`);
+  
+  let skip = Math.floor(Math.random() * 100);
+  for (let i = 0; i < n; i++) {
+    let ux, uy;
+    if (generatorType === 'sobol') {
+      ux = halton(i + 1 + skip, 2);
+      uy = halton(i + 1 + skip, 3);
+    } else {
+      ux = Math.random();
+      uy = Math.random();
+    }
+    const x = bounds.x[0] + ux * (bounds.x[1] - bounds.x[0]);
+    const y = bounds.y[0] + uy * (bounds.y[1] - bounds.y[0]);
+    
+    // Step 2: Evaluate Uncertainty
+    const u = calculateUncertainty(x, y);
+    candidates.push({ x, y, nx: ux, ny: uy, rawUnc: u, penalizedScore: u, id: i });
+  }
+  
+  logTrace(`Evaluated GPR uncertainty for all ${n} points (vectorized).<br>Heatmap shows uncertainty landscape (Amber = high σ).`);
+  
+  updateHeatmap();
+  renderPlot();
+}
+
+function stepBAL() {
+  if (candidates.length === 0) buildGrid();
+  
+  // Find highest penalized score
+  let best = candidates[0];
+  for (const c of candidates) {
+    if (c.penalizedScore > best.penalizedScore) best = c;
+  }
+  
+  if (best.penalizedScore < 0.01) {
+    logTrace(`<span class="c">Space fully explored (Scores ~ 0).</span>`);
+    return;
+  }
+  
+  selectedBatch.push(best);
+  const stepNum = selectedBatch.length;
+  
+  let html = `<span class="a">Batch Point ${stepNum} Selected</span><br>`;
+  html += `x* = (${best.x.toFixed(1)}, ${best.y.toFixed(1)}) | Score = ${best.penalizedScore.toFixed(3)}<br>`;
+  
+  // Apply Local Penalization
+  const radius = parseFloat(ctlRadius.value);
+  const r2 = radius * radius;
+  let penalizedCount = 0;
+  
+  for (const c of candidates) {
+    // Distance in scaled space [0, 1]
+    const d2 = (c.nx - best.nx)**2 + (c.ny - best.ny)**2;
+    const repulsion = Math.exp(-d2 / (2 * r2));
+    const penaltyFactor = Math.max(0, 1 - repulsion);
+    
+    if (penaltyFactor < 0.99 && c.id !== best.id) penalizedCount++;
+    
+    c.penalizedScore = c.penalizedScore * penaltyFactor;
+  }
+  
+  // Set selected point score to 0 so it's not picked again
+  best.penalizedScore = 0;
+  
+  html += `<span class="note">Applied Gaussian repulsion (r=${radius}). Penalized ${penalizedCount} nearby candidates.</span>`;
+  logTrace(html, 'highlight-zone');
+  
+  renderPlot();
+}
+
+// ─── EVENT LISTENERS ───────────────────────────────────────────────────
+document.getElementById('btn-sobol').addEventListener('click', (e) => {
+  generatorType = 'sobol';
+  e.target.classList.add('active');
+  document.getElementById('btn-random').classList.remove('active');
+  buildGrid();
+});
+document.getElementById('btn-random').addEventListener('click', (e) => {
+  generatorType = 'random';
+  e.target.classList.add('active');
+  document.getElementById('btn-sobol').classList.remove('active');
+  buildGrid();
+});
+
+ctlGrid.addEventListener('input', (e) => { lblGrid.textContent = e.target.value; });
+ctlRadius.addEventListener('input', (e) => { lblRadius.textContent = parseFloat(e.target.value).toFixed(2); });
+
+ctlGrid.addEventListener('change', buildGrid);
+ctlRadius.addEventListener('change', () => { if (selectedBatch.length === 0) buildGrid(); });
+
+document.getElementById('btn-generate').addEventListener('click', buildGrid);
+document.getElementById('btn-bal').addEventListener('click', () => {
+  // Run 5 steps automatically for demo
+  let i = 0;
+  function runLoop() {
+    if (i < 5) { stepBAL(); i++; setTimeout(runLoop, 400); }
+  }
+  runLoop();
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  selectedBatch = [];
+  buildGrid();
+});
+
+// Init
+window.addEventListener('resize', updateHeatmap);
+setTimeout(buildGrid, 100);
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEACHING MODE — GUIDED TOUR
+// ═══════════════════════════════════════════════════════════════════════
+const TOUR_STEPS = [
+  {
+    target: null,
+    title: 'Stage 04: Bayesian Active Learning',
+    text: "Welcome! This simulator explains how Stage 04 of the pipeline generates synthetic data. The GPR (Stage 03) has trained on a few real points (the dark circles with teal borders). Now, Stage 04 must decide *where* to test the printer next to learn the most."
+  },
+  {
+    target: '#plot-box',
+    title: 'The Uncertainty Landscape',
+    text: "The background heatmap shows the GPR's uncertainty σ(x). Teal/Dark regions are near existing training data (high confidence, low σ). Amber regions are far from training data (high uncertainty, high σ). BAL wants to sample in the amber regions."
+  },
+  {
+    target: '#ctrl-generator',
+    onEnter: () => { document.getElementById('btn-random').click(); },
+    title: 'Candidate Grid (Random)',
+    text: "First, we generate a grid of candidate points (the white dots). If we use standard Random generation, notice how the points form clumps and leave empty holes. This means we might miss important high-uncertainty areas."
+  },
+  {
+    target: '#ctrl-generator',
+    onEnter: () => { document.getElementById('btn-sobol').click(); },
+    title: 'Candidate Grid (Sobol)',
+    text: "Instead, we use a Sobol Sequence (Low-Discrepancy). Notice how the points are perfectly, evenly distributed across the entire space like a fine mesh, without any clumping. This guarantees the optimizer sees the entire landscape."
+  },
+  {
+    target: '#btn-bal',
+    title: 'The Naive Approach (Greedy)',
+    text: "If we just asked 'give me the top 5 points with the highest uncertainty', the optimizer would pick 5 points sitting directly on top of each other at the single highest amber peak. That's a waste of a batch."
+  },
+  {
+    target: '#plot-box',
+    onEnter: () => { selectedBatch = []; buildGrid(); setTimeout(stepBAL, 100); },
+    title: 'Local Penalization (Step 1)',
+    text: "To fix this, we use Local Penalization. We pick the #1 highest uncertainty point. Then, we apply a mathematical 'repulsion bump' around it (the dashed circle). We multiply the scores of all candidates inside this circle by a factor that drops their score towards zero."
+  },
+  {
+    target: '#plot-box',
+    onEnter: () => { stepBAL(); },
+    title: 'Local Penalization (Step 2)',
+    text: "Now, when we search for point #2, the area around point #1 has been penalized (the dots become transparent, showing their score dropped). The optimizer is forced to look at a completely different amber peak."
+  },
+  {
+    target: '#plot-box',
+    onEnter: () => { stepBAL(); stepBAL(); stepBAL(); },
+    title: 'Batch Diversity Guaranteed',
+    text: "As we pick points 3, 4, and 5, you can see how Local Penalization forces the batch to spread out and cover all the unknown areas of the physics space simultaneously."
+  },
+  {
+    target: '#ctrl-radius',
+    onEnter: () => { 
+      ctlRadius.value = 0.6; lblRadius.textContent = "0.60";
+      selectedBatch = []; buildGrid();
+      setTimeout(() => { stepBAL(); stepBAL(); }, 200);
+    },
+    title: 'Penalty Radius',
+    text: "The 'Penalty Radius' slider controls how wide this repulsion bump is. A larger radius (like 0.6 here) forces the points to be very far apart. A smaller radius allows them to cluster more."
+  },
+  {
+    target: null,
+    onEnter: () => { ctlRadius.value = 0.3; lblRadius.textContent = "0.30"; selectedBatch = []; buildGrid(); },
+    title: 'Ready to Explore',
+    text: "In the real pipeline, Stage 04 evaluates 50,000 Sobol candidates across 5 dimensions and selects 100 points per cycle using this exact math. You can now explore the simulator — change the radius, toggle random/sobol, and run BAL yourself!"
+  }
+];
+
+let tourIndex = 0;
+let tourActive = false;
+const spotEl = document.getElementById('tour-spotlight');
+const popupEl = document.getElementById('tour-popup');
+
+function updateTour() {
+  const step = TOUR_STEPS[tourIndex];
+  document.getElementById('tour-count').textContent = `STEP ${tourIndex + 1} / ${TOUR_STEPS.length}`;
+  document.getElementById('tour-title').textContent = step.title;
+  document.getElementById('tour-text').innerHTML = step.text;
+  
+  document.getElementById('tour-back').style.display = tourIndex === 0 ? 'none' : 'block';
+  document.getElementById('tour-next').textContent = tourIndex === TOUR_STEPS.length - 1 ? 'Finish' : 'Next';
+
+  if (step.onEnter) step.onEnter();
+
+  if (step.target) {
+    const el = document.querySelector(step.target);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      spotEl.style.top = (r.top - 8) + 'px';
+      spotEl.style.left = (r.left - 8) + 'px';
+      spotEl.style.width = (r.width + 16) + 'px';
+      spotEl.style.height = (r.height + 16) + 'px';
+      spotEl.classList.add('active');
+    } else {
+      spotEl.classList.remove('active');
+    }
+  } else {
+    spotEl.classList.remove('active');
+  }
+}
+
+document.getElementById('tour-start').addEventListener('click', () => {
+  tourActive = true; tourIndex = 0;
+  popupEl.classList.add('active');
+  updateTour();
+});
+document.getElementById('tour-next').addEventListener('click', () => {
+  if (tourIndex < TOUR_STEPS.length - 1) { tourIndex++; updateTour(); }
+  else endTour();
+});
+document.getElementById('tour-back').addEventListener('click', () => {
+  if (tourIndex > 0) { tourIndex--; updateTour(); }
+});
+document.getElementById('tour-skip').addEventListener('click', endTour);
+
+function endTour() {
+  tourActive = false;
+  popupEl.classList.remove('active');
+  spotEl.classList.remove('active');
+  selectedBatch = []; buildGrid(); // reset
+}
+
+</script>
+</body>
+</html>
