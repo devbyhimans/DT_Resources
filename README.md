@@ -9,25 +9,20 @@ The folder is systematically organized by topic to make it easy to find related 
 ## 📂 Folder Structure
 
 ```text
-.
-├── Documents/
-│   ├── 01_BAL_and_Bayesian_Optimization/
-│   ├── 02_Digital_Twins_in_AM/
-│   ├── 03_FDM_Process_Optimization/
-│   ├── 04_Books_and_Foundations/
-│   ├── 05_Project_Reports_and_Documentation/
-│   ├── 06_Figures_and_Diagrams/
-│   └── 07_Interactive_Simulations/
-└── tree_preview.json
+Documents/
+├── 01_BAL_and_Bayesian_Optimization/
+├── 02_Digital_Twins_in_AM/
+├── 03_FDM_Process_Optimization/
+├── 04_Books_and_Foundations/
+├── 05_Project_Reports_and_Documentation/
+├── 06_Figures_and_Diagrams/
+└── 07_Interactive_Simulations/
 ```
 
 ---
 
 ## 📑 Detailed File Previews
 
-### 📄 Root Files
-* **`tree_preview.json`**
-  * *Preview:* A JSON file representing the hierarchical structure of the repository.
 
 ### 📁 `01_BAL_and_Bayesian_Optimization`
 *Research papers focused on Bayesian Active Learning, Local Penalization batch sampling, and Active Constraint Learning.*
