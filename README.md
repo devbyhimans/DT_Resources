@@ -9,19 +9,25 @@ The folder is systematically organized by topic to make it easy to find related 
 ## 📂 Folder Structure
 
 ```text
-Documents/
-├── 01_BAL_and_Bayesian_Optimization/
-├── 02_Digital_Twins_in_AM/
-├── 03_FDM_Process_Optimization/
-├── 04_Books_and_Foundations/
-├── 05_Project_Reports_and_Documentation/
-├── 06_Figures_and_Diagrams/
-└── 07_Interactive_Simulations/
+.
+├── Documents/
+│   ├── 01_BAL_and_Bayesian_Optimization/
+│   ├── 02_Digital_Twins_in_AM/
+│   ├── 03_FDM_Process_Optimization/
+│   ├── 04_Books_and_Foundations/
+│   ├── 05_Project_Reports_and_Documentation/
+│   ├── 06_Figures_and_Diagrams/
+│   └── 07_Interactive_Simulations/
+└── tree_preview.json
 ```
 
 ---
 
 ## 📑 Detailed File Previews
+
+### 📄 Root Files
+* **`tree_preview.json`**
+  * *Preview:* A JSON file representing the hierarchical structure of the repository.
 
 ### 📁 `01_BAL_and_Bayesian_Optimization`
 *Research papers focused on Bayesian Active Learning, Local Penalization batch sampling, and Active Constraint Learning.*
@@ -76,16 +82,12 @@ Documents/
   * *Preview:* The master project overview, explaining what AM is, its advantages, limitations, and the strategic plan of action.
 * **`FDM_Agentic_Digital_Twin_Complete_Documentation.md`**
   * *Preview:* Exhaustive technical markdown documentation covering the FDM Agentic Digital Twin concept, architecture, and code logic.
-* **`FDM_Agentic_Digital_Twin_Concepts_for_PPT.md`**
-  * *Preview:* Conceptual breakdown designed specifically for extracting bullet points for presentation slides.
 * **`GPR_and_BAL_PPT_Explanation.md`**
   * *Preview:* A simplified, intuitive explanation of GPR and BAL designed for a non-technical audience or evaluation panel.
-* **`honest_assessment.md`**
+* **`Assesement.md`**
   * *Preview:* A brutally honest self-assessment of the FDM Digital Twin Pipeline's strengths, limitations, and areas for future improvement.
 * **`results_presentation_script.md`**
   * *Preview:* Script and visual guide designed to help structure the "Results" section of the final presentation.
-* **`main.tex`**
-  * *Preview:* The LaTeX source code used to compile the main documentation report.
 
 ### 📁 `06_Figures_and_Diagrams`
 *Process flowcharts, system architecture diagrams, and mathematical explanation assets.*
